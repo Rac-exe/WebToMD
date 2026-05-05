@@ -26,7 +26,7 @@ def to_markdown(
     Returns:
         Clean Markdown string.
     """
-    source_html = html
+    source_html = _sanitize_html(html)
     title = "Untitled"
 
     if selector:
@@ -54,6 +54,8 @@ def to_markdown(
         bullets="-",
         strip=["script", "style", "nav", "footer"],
     )
+    markdown = _normalize_numbering(markdown)
+    markdown = _drop_css_noise(markdown)
     markdown = re.sub(r"\n{3,}", "\n\n", markdown).strip()
 
     if metadata and url:
@@ -73,3 +75,72 @@ def _build_frontmatter(title: str, url: str) -> str:
         f'date: "{today}"\n'
         "---"
     )
+
+
+def _normalize_numbering(markdown: str) -> str:
+    """Fix common markdownify/trafilatura numbering glitches.
+
+    Examples:
+    - "## 1Getting Started" -> "## 1. Getting Started"
+    - "- 1Open app" -> "- 1. Open app"
+    - "1Install" -> "1. Install"
+    """
+    lines = markdown.splitlines()
+    normalized: list[str] = []
+
+    heading_re = re.compile(r"^(#{1,6}\s+)(\d+)([A-Za-z].*)$")
+    list_re = re.compile(r"^(\s*[-*]\s+)(\d+)([A-Za-z].*)$")
+    plain_re = re.compile(r"^(\s*)(\d+)([A-Za-z].*)$")
+
+    for line in lines:
+        m = heading_re.match(line)
+        if m:
+            normalized.append(f"{m.group(1)}{m.group(2)}. {m.group(3)}")
+            continue
+
+        m = list_re.match(line)
+        if m:
+            normalized.append(f"{m.group(1)}{m.group(2)}. {m.group(3)}")
+            continue
+
+        m = plain_re.match(line)
+        if m:
+            normalized.append(f"{m.group(1)}{m.group(2)}. {m.group(3)}")
+            continue
+
+        normalized.append(line)
+
+    return "\n".join(normalized)
+
+
+def _sanitize_html(html: str) -> str:
+    """Remove high-noise tags before markdown conversion."""
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup.find_all(["script", "style", "noscript", "template"]):
+        tag.decompose()
+    return str(soup)
+
+
+def _drop_css_noise(markdown: str) -> str:
+    """Drop common CSS blobs that can leak through raw HTML conversion."""
+    cleaned: list[str] = []
+    for line in markdown.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            cleaned.append(line)
+            continue
+
+        if stripped.startswith("@import url("):
+            continue
+
+        # Heuristic CSS-like line filter.
+        if (
+            ("{" in stripped and "}" in stripped)
+            or stripped.startswith("@keyframes ")
+            or stripped.startswith(".")
+        ) and ":" in stripped:
+            continue
+
+        cleaned.append(line)
+
+    return "\n".join(cleaned)

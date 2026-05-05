@@ -191,3 +191,46 @@ Why:
   - detect 2-column table patterns and rebuild markdown tables.
 - Tighten main-content targeting on landing pages:
   - optional extraction heuristic to prioritize repeated heading/section containers.
+
+## 2026-05-05 23:23:29 +05:30 — Phase 1.5 implementation and verification
+
+### What changed
+- Implemented Phase 1.5 extraction quality improvements in `webtomd/fetcher.py`:
+  - Added `_download_html()` fallback path:
+    - try `trafilatura.fetch_url()` first,
+    - then fallback to `httpx.get()` with browser-like user-agent if primary fetch fails.
+  - Added quality heuristic in `fetch()`:
+    - if trafilatura extraction is disproportionately short compared to source HTML, use raw HTML for conversion.
+- Implemented Phase 1.5 markdown cleanup in `webtomd/converter.py`:
+  - `_normalize_numbering()` now fixes broken tokens like:
+    - `## 1Getting Started` -> `## 1. Getting Started`
+    - `- 1Open` -> `- 1. Open`
+  - `_sanitize_html()` removes noisy tags (`script`, `style`, `noscript`, `template`) before conversion.
+  - `_drop_css_noise()` removes leaked CSS lines in markdown output.
+- Extended tests:
+  - `tests/test_fetcher.py`:
+    - fallback to `httpx` when trafilatura fetch returns `None`,
+    - prefer raw HTML when extracted content is too short.
+  - `tests/test_converter.py`:
+    - numbering normalization checks,
+    - sanitize-html checks,
+    - CSS noise filtering checks.
+
+### Why these changes were required
+- Real-world extraction on `tryprmpt.com` showed two issues:
+  1. homepage was either too sparse or over-trimmed,
+  2. docs page had broken numbered list formatting.
+- The fallback fetch + quality heuristic improved coverage without waiting for full Phase 2 fallback chain.
+- Post-processing normalization significantly improved readability for docs-style content.
+
+### Verification performed
+- Test suite run after changes:
+  - `21 passed`.
+- Re-ran same real-site extraction commands:
+  - `https://www.tryprmpt.com/`
+  - `https://www.tryprmpt.com/help`
+- Result comparison:
+  - `tryprmpt-home.md`: improved from **55 lines** to **105 lines** with much better section coverage.
+  - `tryprmpt-help.md`: line count unchanged (**234**) but numbering quality improved (`1Getting` -> `1. Getting`, `- 1Open` -> `- 1. Open`).
+- Remaining known gap:
+  - some two-column table-like sections in help output still flatten into line pairs; table reconstruction remains future work.

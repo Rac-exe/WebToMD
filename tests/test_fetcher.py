@@ -31,3 +31,38 @@ def test_is_sparse_with_real_content():
 def test_url_to_filename():
     from webtomd.utils import url_to_filename
     assert url_to_filename("https://stripe.com/docs/api") == "stripe-com-docs-api"
+
+
+def test_fetch_uses_raw_html_when_primary_is_sparse(monkeypatch):
+    from webtomd import fetcher
+
+    monkeypatch.setattr(fetcher, "fetch_trafilatura", lambda _url, downloaded_html=None: "tiny")
+    monkeypatch.setattr(fetcher, "_download_html", lambda _url: "<html><body>" + ("x" * 400) + "</body></html>")
+
+    result = fetcher.fetch("https://example.com")
+    assert "html" in result
+
+
+def test_download_html_falls_back_to_httpx(monkeypatch):
+    from webtomd import fetcher
+
+    class _Resp:
+        status_code = 200
+        text = "<html><body>ok</body></html>"
+
+    monkeypatch.setattr(fetcher.trafilatura, "fetch_url", lambda _url: None)
+    monkeypatch.setattr(fetcher.httpx, "get", lambda *_args, **_kwargs: _Resp())
+
+    html = fetcher._download_html("https://example.com")
+    assert html == "<html><body>ok</body></html>"
+
+
+def test_fetch_prefers_raw_html_when_extraction_is_too_short(monkeypatch):
+    from webtomd import fetcher
+
+    raw = "<html><body>" + ("x" * 20_000) + "</body></html>"
+    monkeypatch.setattr(fetcher, "_download_html", lambda _url: raw)
+    monkeypatch.setattr(fetcher, "fetch_trafilatura", lambda _url, downloaded_html=None: "y" * 200)
+
+    result = fetcher.fetch("https://example.com")
+    assert result == raw

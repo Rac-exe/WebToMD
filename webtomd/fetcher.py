@@ -7,6 +7,7 @@ Stage 3: playwright   (full JS render for SPAs — optional install)
 
 from __future__ import annotations
 
+import httpx
 import trafilatura
 import typer
 
@@ -19,22 +20,29 @@ def fetch(url: str, selector: str | None = None) -> str:
     Escalates through the fallback chain automatically on sparse results.
     """
     _ = selector  # kept for Phase 2 selector-aware extraction path
-    content = fetch_trafilatura(url)
-    if is_sparse(content):
+    raw_html = _download_html(url)
+    if is_sparse(raw_html) or raw_html is None:
         raise typer.BadParameter(
             "Could not extract meaningful content from this page. "
-            "Phase 1 only supports the primary extraction path. "
-            "Fallback chain lands in Phase 2."
+            "Fallback chain (readability/playwright) lands in Phase 2."
         )
-    if content is None:
-        # Defensive guard for type checkers after sparse check.
-        raise typer.BadParameter("No content extracted from URL.")
+
+    content = fetch_trafilatura(url, downloaded_html=raw_html)
+    if is_sparse(content) or content is None:
+        return raw_html
+
+    # Phase 1.5 quality heuristic:
+    # if extraction is disproportionately tiny vs source HTML,
+    # prefer raw HTML so conversion keeps more page sections.
+    if len(raw_html) > 10_000 and len(content) < int(len(raw_html) * 0.08):
+        return raw_html
+
     return content
 
 
-def fetch_trafilatura(url: str) -> str | None:
+def fetch_trafilatura(url: str, downloaded_html: str | None = None) -> str | None:
     """Stage 1 — trafilatura extraction."""
-    downloaded = trafilatura.fetch_url(url)
+    downloaded = downloaded_html or _download_html(url)
     if not downloaded:
         return None
 
@@ -45,6 +53,32 @@ def fetch_trafilatura(url: str) -> str | None:
         include_links=True,
         favor_recall=True,
     )
+
+
+def _download_html(url: str) -> str | None:
+    """Download HTML using trafilatura first, then a browser-like httpx fallback."""
+    downloaded = trafilatura.fetch_url(url)
+    if downloaded:
+        return downloaded
+
+    try:
+        response = httpx.get(
+            url,
+            timeout=20.0,
+            follow_redirects=True,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                )
+            },
+        )
+        if response.status_code >= 400:
+            return None
+        return response.text
+    except Exception:
+        return None
 
 
 def fetch_readability(url: str) -> str | None:
