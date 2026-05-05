@@ -1,0 +1,36 @@
+---
+description: Git commit standards — no co-author lines, clean commit messages
+alwaysApply: true
+---
+
+# Git Commit Rules
+
+## Co-authorship — strictly forbidden
+
+NEVER add any of the following to commit messages:
+- `Co-authored-by: ...`
+- `Co-authored-by: Claude <...>`
+- `Co-authored-by: GitHub Copilot <...>`
+- Any AI attribution line of any kind
+
+Every commit must be authored solely by Prabhat. No exceptions.
+
+## Commit message format
+
+- Concise subject line (50 chars max)
+- Focus on the "why", not the "what"
+- No period at end of subject line
+- Body optional, separated by a blank line if used
+
+## Example
+
+```
+Add trafilatura fallback chain for sparse content
+```
+
+Not:
+```
+Add trafilatura fallback chain for sparse content
+
+Co-authored-by: Claude <noreply@anthropic.com>
+```

@@ -1,0 +1,52 @@
+# ── Planning docs (not part of the shipped package) ──
+webtomd-pitch.html
+webtomd-sepm.md
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+wheels/
+
+# ── uv / virtualenv ──
+.venv/
+.uv/
+uv.lock
+
+# ── Environment & secrets ──
+.env
+.env.*
+*.env
+
+# ── Testing ──
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# ── Type checking ──
+.mypy_cache/
+.ruff_cache/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editors ──
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Docs / demo artifacts ──
+docs/demo.gif
+docs/demo-ai.gif
