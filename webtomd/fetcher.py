@@ -6,7 +6,7 @@ import httpx
 import re
 import trafilatura
 import typer
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout, as_completed
 from dataclasses import dataclass
 
 from webtomd.utils import is_sparse
@@ -234,34 +234,43 @@ def fetch_trafilatura(
 
 
 def _download_html(url: str, timeout_s: float = DEFAULT_DOWNLOAD_TIMEOUT_S) -> str | None:
-    """Download HTML using trafilatura first, then a browser-like httpx fallback."""
-    downloaded = _run_with_timeout(lambda: trafilatura.fetch_url(url), timeout_s=min(timeout_s, FETCH_STAGE_TIMEOUT_S))
-    if downloaded:
-        return downloaded
+    """Download HTML via trafilatura and httpx in parallel, take first success."""
+    traf_timeout = min(timeout_s, FETCH_STAGE_TIMEOUT_S)
+    httpx_timeout = min(timeout_s + 2.0, FETCH_STAGE_TIMEOUT_S)
 
-    try:
-        response = _run_with_timeout(
-            lambda: httpx.get(
-                url,
-                timeout=timeout_s,
-                follow_redirects=True,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/124.0.0.0 Safari/537.36"
-                    )
-                },
-            ),
-            timeout_s=min(timeout_s + 2.0, FETCH_STAGE_TIMEOUT_S),
+    def _traf():
+        return trafilatura.fetch_url(url)
+
+    def _httpx():
+        resp = httpx.get(
+            url,
+            timeout=timeout_s,
+            follow_redirects=True,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                )
+            },
         )
-        if response is None:
+        if resp.status_code >= 400:
             return None
-        if response.status_code >= 400:
-            return None
-        return response.text
-    except Exception:
-        return None
+        return resp.text
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        fut_traf = pool.submit(_run_with_timeout, _traf, timeout_s=traf_timeout)
+        fut_httpx = pool.submit(_run_with_timeout, _httpx, timeout_s=httpx_timeout)
+
+        for future in as_completed([fut_traf, fut_httpx], timeout=max(traf_timeout, httpx_timeout) + 3):
+            try:
+                result = future.result(timeout=1)
+                if result:
+                    return result
+            except Exception:
+                continue
+
+    return None
 
 
 def fetch_readability(
