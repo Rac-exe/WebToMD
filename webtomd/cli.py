@@ -58,6 +58,51 @@ def _format_trace(trace_strategy: str, trace_note: str) -> str:
     return f"via {trace_strategy} ({brief})"
 
 
+def _convert_stdin(
+    cfg: app_config.Config,
+    *,
+    output: str | None,
+    stdout_flag: bool,
+    selector: str | None,
+    ai_mode: str | None,
+    open_after: bool,
+) -> bool:
+    """Convert HTML from stdin. Returns True on success."""
+    raw_html = sys.stdin.read()
+    if not raw_html.strip():
+        print_error("No input received from stdin.", silent=bool(cfg.silent))
+        return False
+
+    synthetic_url = "stdin://"
+    try:
+        title_hint = extract_title_hint(raw_html, selector=selector)
+        markdown = to_markdown(
+            html=raw_html,
+            url=synthetic_url,
+            metadata=bool(cfg.metadata),
+            selector=selector,
+        )
+    except SelectorNotFoundError as exc:
+        print_error(str(exc), silent=bool(cfg.silent))
+        return False
+    except Exception as exc:
+        print_error(f"Conversion failed: {exc}", silent=bool(cfg.silent))
+        return False
+
+    return _emit_result(
+        markdown=markdown,
+        url=synthetic_url,
+        title_hint=title_hint,
+        cfg=cfg,
+        output=output,
+        stdout_flag=stdout_flag,
+        ai_mode=ai_mode,
+        open_after=open_after,
+        trace_strategy="stdin",
+        trace_note="raw HTML from stdin",
+    )
+
+
 def _convert_single(
     url: str,
     cfg: app_config.Config,
@@ -69,12 +114,6 @@ def _convert_single(
     open_after: bool,
 ) -> bool:
     """Convert a single URL. Returns True on success."""
-    output_mode = _resolve_output_mode(
-        explicit_output=output,
-        force_stdout=stdout_flag,
-        interactive=_is_interactive_terminal(),
-    )
-
     try:
         with start_spinner(next_witty_message(), silent=bool(cfg.silent)):
             html = fetch(url=url, selector=selector)
@@ -92,13 +131,47 @@ def _convert_single(
         print_error(f"Fetch failed for {url}: {exc}", silent=bool(cfg.silent))
         return False
 
+    trace = get_last_fetch_trace()
+    return _emit_result(
+        markdown=markdown,
+        url=url,
+        title_hint=title_hint,
+        cfg=cfg,
+        output=output,
+        stdout_flag=stdout_flag,
+        ai_mode=ai_mode,
+        open_after=open_after,
+        trace_strategy=trace.strategy,
+        trace_note=trace.note,
+    )
+
+
+def _emit_result(
+    *,
+    markdown: str,
+    url: str,
+    title_hint: str | None,
+    cfg: app_config.Config,
+    output: str | None,
+    stdout_flag: bool,
+    ai_mode: str | None,
+    open_after: bool,
+    trace_strategy: str,
+    trace_note: str,
+) -> bool:
+    """Shared output logic for both URL and stdin paths. Returns True on success."""
+    output_mode = _resolve_output_mode(
+        explicit_output=output,
+        force_stdout=stdout_flag,
+        interactive=_is_interactive_terminal(),
+    )
+
     if ai_mode:
         markdown = _apply_ai(markdown, ai_mode, cfg)
 
     token_count = len(markdown.split())
-    trace = get_last_fetch_trace()
     print_success(
-        f"Converted to Markdown ({token_count} tokens) {_format_trace(trace.strategy, trace.note)}",
+        f"Converted to Markdown ({token_count} tokens) {_format_trace(trace_strategy, trace_note)}",
         silent=bool(cfg.silent),
     )
 
@@ -257,6 +330,18 @@ def snap(
             open_after=open_after,
         )
         raise typer.Exit(0)
+
+    _stdin_mode = url == "-" or (not url and not sys.stdin.isatty())
+    if _stdin_mode:
+        ok = _convert_stdin(
+            cfg,
+            output=output,
+            stdout_flag=stdout,
+            selector=selector,
+            ai_mode=ai,
+            open_after=open_after,
+        )
+        raise typer.Exit(0 if ok else 1)
 
     if not url:
         raise typer.BadParameter("URL is required. Example: webtomd https://example.com")
