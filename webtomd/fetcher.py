@@ -301,11 +301,26 @@ def fetch_readability_from_html(
     return _run_with_timeout(_extract, timeout_s=timeout_s)
 
 
+_PLAYWRIGHT_HINT_SHOWN = False
+
+
 def fetch_playwright(url: str, timeout_s: float = PLAYWRIGHT_STAGE_TIMEOUT_S) -> str | None:
     """Stage 3 — headless Chromium fallback (optional install)."""
+    global _PLAYWRIGHT_HINT_SHOWN
     try:
         from playwright.sync_api import sync_playwright
     except Exception:
+        if not _PLAYWRIGHT_HINT_SHOWN:
+            _PLAYWRIGHT_HINT_SHOWN = True
+            try:
+                from webtomd.renderer import print_warn
+                print_warn(
+                    "JS-rendered page detected. For better results install Playwright:\n"
+                    "  pip install webtomd[playwright] && playwright install chromium",
+                    silent=False,
+                )
+            except Exception:
+                pass
         return None
 
     def _render() -> str | None:
