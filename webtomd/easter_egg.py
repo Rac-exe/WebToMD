@@ -243,10 +243,10 @@ def _make_enemy(state: GameState, force_pattern: str | None = None) -> Entity:
 def _tick(state: GameState) -> None:
     state.ticks += 1
 
-    if state.move_left and state.player.x > 1:
-        state.player.x -= 1
-    if state.move_right and state.player.x < GAME_WIDTH - 2:
-        state.player.x += 1
+    if state.move_left and state.player.x > 2:
+        state.player.x -= 2
+    if state.move_right and state.player.x < GAME_WIDTH - 3:
+        state.player.x += 2
 
     cooldown = FIRE_COOLDOWN_RAPID if state.active_powerup == "R" else FIRE_COOLDOWN_NORMAL
     if state.shooting and (state.ticks - state.last_shot_tick) >= cooldown:
