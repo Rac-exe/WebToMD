@@ -447,3 +447,62 @@ Why:
 - Linear Reviews: `133` lines, `12` headings (retains core content with less docs chrome).
 - Wikipedia Egyptians: `1110` lines, `35` headings (strong main-content retention).
 - Claude Skills Overview: `305` lines, `31` headings (cookie/loading shell markers removed in this run).
+
+## 2026-05-07 23:28:24 +05:30 — Next-Level Quality phase execution
+
+### Commit sequence executed
+- Checkpoint one-line commit:
+  - `2faa3f6` — Implement quality fallback, selector support, and benchmark validation
+- Granular one-line commits:
+  - `677c54d` — Score extraction candidates and pick highest-quality fallback
+  - `3c67215` — Add conservative pruning guardrails to avoid over-stripping content
+  - `13b4c5c` — Reduce link-wall noise and harden numbering normalization
+  - `3369a78` — Tune stage timeouts and failover budgets for heavy pages
+  - `146bad1` — Show concise extraction reason in conversion success output
+
+### Code improvements delivered
+- `webtomd/fetcher.py`
+  - Added candidate scoring for trafilatura/readability/playwright outputs.
+  - Added score-based winner selection with thresholding and detailed trace note.
+  - Added adaptive per-page stage timeouts (heavy-page aware).
+  - Added compatibility wrapper for monkeypatched function signatures in tests.
+- `webtomd/converter.py`
+  - Strengthened anti-overprune guardrails for structural cleanup.
+  - Added stronger markdown cleanup for repeated link-wall lines.
+  - Improved numbering normalization around ordinal forms (`3rd-party` cases).
+- `webtomd/cli.py`
+  - Added concise strategy reason text in success output.
+
+### Validation
+- Focused tests:
+  - `python -m pytest tests/test_fetcher.py tests/test_converter.py tests/test_output.py tests/test_cli_modes.py tests/test_naming.py`
+  - Result: `23 passed`.
+
+### Benchmark rerun
+- New artifacts:
+  - `eval-runs/five-links-next-phase-20260507-232241/`
+  - `logs/timings.csv`
+  - `logs/before-after-summary.json`
+
+### Before/after quality snapshot (vs `five-links-post-improvements-20260507-230411`)
+- Minecraft:
+  - before: `1075` lines / `43` headings / `139` list items
+  - after: `1160` lines / `49` headings / `191` list items
+  - note: richer retained content after adaptive pruning guardrails.
+- Linear My Issues:
+  - unchanged at `75` lines / `7` headings / `16` list items.
+- Linear Reviews:
+  - unchanged at `133` lines / `12` headings.
+- Wikipedia Egyptians:
+  - reduced to `1039` lines (from `1110`) with headings preserved (`35`).
+- Claude Skills Overview:
+  - reduced to `295` lines (from `305`) with near-stable structure (`29` headings vs `31`).
+
+### Runtime comparison (explicit mode)
+- previous:
+  - Minecraft `113.90s`, Linear My Issues `3.22s`, Linear Reviews `3.68s`, Wikipedia `4.26s`, Claude docs `3.90s`
+- current:
+  - Minecraft `116.52s`, Linear My Issues `3.41s`, Linear Reviews `5.00s`, Wikipedia `5.80s`, Claude docs `3.06s`
+- interpretation:
+  - quality/guardrail changes improved structural retention and cleanup;
+  - latency is still bounded and predictable but not yet materially faster on heavy pages.
