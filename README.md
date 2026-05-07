@@ -16,13 +16,23 @@ pip install webtomd
 ## Usage
 
 ```bash
-# Basic conversion
+# Basic conversion (interactive terminal: auto-saves a .md file)
 webtomd https://example.com/article
 
-# Save to file
+# Save to a specific file name
 webtomd https://example.com/article -o article.md
 
-# Copy to clipboard
+# Force stdout output (useful for pipelines)
+webtomd https://example.com/article --stdout
+
+# Piped usage automatically stays stdout
+webtomd https://example.com/article | rg "##"
+
+# Filename strategy
+webtomd https://example.com/article --name-strategy deterministic
+webtomd https://example.com/article --name-strategy ai
+
+# Copy to clipboard (works with auto-save or stdout)
 webtomd https://example.com/article --copy
 
 # AI summary (auto-detects your API key)
@@ -31,6 +41,19 @@ webtomd https://example.com/article --ai summarize
 # Batch process
 webtomd --batch urls.txt -o ./output/
 ```
+
+### Output defaults
+
+- Interactive terminal: `webtomd <url>` auto-saves to a generated `.md` file.
+- Piped/non-interactive run: `webtomd <url>` prints markdown to stdout.
+- `-o/--output` always wins if you provide it.
+- `--stdout` always forces stdout.
+
+### Naming defaults
+
+- Default strategy: `deterministic` (title/URL + host slug + collision-safe suffixes).
+- Optional strategy: `ai` (opt-in, requires any supported provider key in env).
+- If AI naming is requested but unavailable, webtomd falls back to deterministic naming.
 
 ## Install
 

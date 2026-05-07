@@ -234,3 +234,94 @@ Why:
   - `tryprmpt-help.md`: line count unchanged (**234**) but numbering quality improved (`1Getting` -> `1. Getting`, `- 1Open` -> `- 1. Open`).
 - Remaining known gap:
   - some two-column table-like sections in help output still flatten into line pairs; table reconstruction remains future work.
+
+## 2026-05-07 20:17:23 +05:30 — Auto-save and naming UX implementation
+
+### What changed
+- Implemented output-mode resolver in `webtomd/cli.py`:
+  - explicit `-o/--output` -> file
+  - `--stdout` -> stdout
+  - interactive terminal -> auto-save
+  - piped/non-interactive -> stdout
+- Added deterministic filename generation in `webtomd/utils.py`:
+  - `slugify(...)`
+  - `host_slug(...)`
+  - `unique_path(...)` with `-2`, `-3`, ... collision handling
+  - `build_output_path(...)` as the final resolver
+- Added title hint extraction in `webtomd/converter.py`:
+  - `extract_title_hint(...)`
+- Added naming config/flag support:
+  - `name_strategy` field in `webtomd/config.py` (default: `deterministic`)
+  - `--name-strategy` and `--stdout` in CLI
+- Added AI naming opt-in scaffold:
+  - new file `webtomd/ai/naming.py`
+  - checks provider env keys
+  - generates concise filename stem
+  - non-blocking fallback to deterministic naming with warning
+- Updated docs in `README.md` for new defaults and flags.
+
+### Why these changes were required
+- Better UX goal: plain `webtomd <url>` should usually produce a ready-to-use file without requiring `-o`.
+- Preserve CLI power behavior by keeping stdout for piped/non-interactive runs.
+- Add predictable naming that avoids collisions and supports future smarter naming.
+
+### Verification plan
+- Run full tests.
+- Validate:
+  - interactive auto-save,
+  - piped stdout behavior,
+  - `--stdout` override,
+  - deterministic naming,
+  - AI naming fallback path.
+
+### Verification results (2026-05-07 20:20:26 +05:30)
+- Test suite: `28 passed`.
+- Manual checks:
+  - `--stdout` emitted markdown to stdout successfully.
+  - Plain piped run (`webtomd <url> | ...`) produced stdout and created **0 files** in a temp folder.
+  - Deterministic naming generated host-aware filename stem (`example-title-examplecom.md`).
+  - `--name-strategy ai --stdout` executed without failure and stayed non-blocking.
+- Additional robustness fix:
+  - On Windows CP1252 terminals, Unicode status glyphs caused render errors.
+  - Added encoding-safe status symbols in `webtomd/renderer.py` (`OK/WARN/ERR` fallback).
+
+## 2026-05-07 20:40:02 +05:30 — Multi-link method verification and output quality audit
+
+### Scope
+- Verified behavior against these links:
+  - `https://www.minecraft.net/en-us`
+  - `https://linear.app/docs/my-issues`
+  - `https://linear.app/docs/diffs`
+  - `https://en.wikipedia.org/wiki/Egyptians`
+  - `https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview`
+
+### What was run
+- Quick reachability check with `httpx` for all links (all returned HTTP 200 quickly).
+- Guardrail command checks:
+  - `--batch` (Phase 2 message),
+  - `--selector` (Phase 2 message),
+  - `--ai` (Phase 3 message).
+- Full extraction audit via internal conversion pipeline (same converter + naming logic), writing outputs under:
+  - `eval-runs/2026-05-07-internal-eval`
+
+### Key findings
+- Core extraction quality differs by site type:
+  - Linear docs pages: generally good content fidelity; minor nav/header noise remains.
+  - Claude docs page: high nav/footer chrome noise; actual article mixed with doc shell.
+  - Wikipedia page: substantial sidebar/nav clutter overwhelms article body.
+  - Minecraft marketing page: highly noisy due mega-menu/navigation-heavy layout.
+- AI naming path currently acts as an opt-in scaffold and may produce same filename as deterministic when title is already high quality.
+- Important runtime note:
+  - direct CLI runs on some of these links can stall at `trafilatura.fetch_url` before fallback kicks in; this needs a timeout/short-circuit hardening pass.
+
+### Output metrics snapshot (internal eval)
+- Minecraft: 1171 lines, 26 headings, 191 list items (very noisy)
+- Linear My Issues: 118 lines, 7 headings (good)
+- Linear Reviews: 181 lines, 12 headings (good)
+- Wikipedia Egyptians: 1497 lines, 37 headings, 664 table markers (heavy chrome)
+- Claude Skills Overview: 521 lines, 39 headings, 10 code fences (content present but shell-heavy)
+
+### Recommended follow-ups
+- Add extraction-time timeout around trafilatura primary fetch.
+- Add doc-shell pruning heuristics for known doc portals (Linear, Claude docs, Wikipedia).
+- Add readability fallback before raw-html conversion for nav-heavy pages.
