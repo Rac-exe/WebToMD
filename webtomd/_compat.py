@@ -1,13 +1,4 @@
-"""Space Galaxy Shooter — hidden easter egg.
-
-Triggered by: webtomd https://play.webtomd.dev
-Built with rich.Live (rendering) + pynput (keyboard input).
-Cross-platform: Windows, macOS, Linux.
-
-Controls: Arrow keys to move, Space to shoot, Q to quit.
-Features: Colored entities, explosions, enemy AI patterns, boss waves,
-          power-ups, high score persistence, sound feedback, replay.
-"""
+"""Backward-compatibility shims for legacy terminal environments."""
 
 from __future__ import annotations
 
