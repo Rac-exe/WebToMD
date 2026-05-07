@@ -627,3 +627,30 @@ Why:
 - Entry point `webtomd = webtomd.cli:app` verified via `entry_points.txt`.
 - `webtomd --help` and `python -m webtomd --help` both functional.
 - `pyproject.toml` metadata complete: classifiers, keywords, URLs, license.
+
+### Performance Pass
+
+#### Heavy Page Optimization (`webtomd/fetcher.py`)
+- **HTML size cap**: Pages exceeding 500KB skip trafilatura entirely and go straight to readability (much faster on bloated pages).
+- **Parallel extraction**: Trafilatura + readability now run concurrently via `ThreadPoolExecutor(max_workers=2)` instead of sequentially. Playwright post-render extraction also parallelized.
+- **Tighter heavy-page thresholds**: Lowered detection from 450KB/120 scripts → 300KB/80 scripts. Tightened budgets: extract 6s, readability 5s, playwright 10s (down from 8s/7s/12s).
+- **`_safe_future_result`**: Helper to extract results from futures with safe error handling.
+
+#### Playwright Install UX
+- When `fetch_playwright` detects a JS-rendered page but playwright is not installed, prints a one-time friendly hint: install command and `playwright install chromium`.
+- Gated by `_PLAYWRIGHT_HINT_SHOWN` module-level flag — only shown once per session.
+
+### 5-URL Benchmark Results
+
+| URL | Time | Words | Strategy |
+|---|---|---|---|
+| minecraft.net/en-us | 100.9s | 3,536 | raw_html |
+| linear.app/docs/my-issues | 3.5s | 412 | raw_html |
+| linear.app/docs/diffs | 2.0s | 1,210 | raw_html |
+| wikipedia.org/wiki/Egyptians | 4.9s | 21,532 | readability |
+| platform.claude.com/agent-skills | 1.9s | 2,218 | readability |
+
+- 4 of 5 URLs complete in under 5 seconds.
+- Minecraft.net is an outlier due to slow download phase (heavy CDN/JS page), not extraction.
+- Readability strategy is correctly selected for content-rich pages (Wikipedia, Claude docs).
+- All 98 tests passing.
