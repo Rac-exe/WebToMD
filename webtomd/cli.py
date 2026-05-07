@@ -308,6 +308,7 @@ def snap(
     selector: str = typer.Option(None, "--selector", help="CSS selector to extract specific page content"),
     metadata: bool | None = typer.Option(None, "--metadata/--no-metadata", help="Prepend YAML frontmatter with title, URL, and date"),
     open_after: bool = typer.Option(False, "--open", help="Open the saved file in your default editor"),
+    depth: int = typer.Option(0, "--depth", help="Crawl same-domain links N levels deep (0 = single page)"),
 ) -> None:
     """Convert any URL to clean Markdown."""
 
@@ -367,6 +368,35 @@ def snap(
     if not is_valid_url(url):
         print_error(f"Invalid URL: {url}", silent=bool(cfg.silent))
         raise typer.Exit(1)
+
+    if depth > 0:
+        from webtomd.crawler import crawl
+        from webtomd.renderer import console
+
+        console.print(f"[bold cyan]Crawling[/bold cyan] {url} [dim](depth={depth})[/dim]")
+        discovered = crawl(url, depth=depth)
+        console.print(f"[bold cyan]Discovered {len(discovered)} pages[/bold cyan]\n")
+
+        results = {"success": 0, "failed": 0}
+        for page_url in discovered:
+            ok = _convert_single(
+                page_url,
+                cfg,
+                output=None,
+                stdout_flag=stdout,
+                selector=selector,
+                ai_mode=ai,
+                open_after=open_after,
+            )
+            if ok:
+                results["success"] += 1
+            else:
+                results["failed"] += 1
+        console.print(
+            f"\n[bold]Crawl complete:[/bold] {results['success']} succeeded, "
+            f"{results['failed']} failed\n"
+        )
+        raise typer.Exit(0 if results["failed"] == 0 else 1)
 
     ok = _convert_single(
         url,
