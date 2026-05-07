@@ -16,11 +16,29 @@ DEFAULT_DOWNLOAD_TIMEOUT_S = 20.0
 FETCH_STAGE_TIMEOUT_S = 25.0
 EXTRACT_STAGE_TIMEOUT_S = 12.0
 TRAFILATURA_MIN_KEEP_RATIO = 0.08
+MIN_ACCEPTABLE_SCORE = 0.18
+NAV_TOKEN_PENALTY = (
+    "skip to content",
+    "cookie settings",
+    "accept all cookies",
+    "reject all cookies",
+    "sign up",
+    "open app",
+    "loading...",
+)
 
 
 @dataclass
 class FetchTrace:
     strategy: str
+    note: str
+
+
+@dataclass
+class ExtractCandidate:
+    strategy: str
+    content: str
+    score: float
     note: str
 
 
@@ -52,34 +70,65 @@ def fetch(url: str, selector: str | None = None) -> str:
         _set_trace("selector_raw_html", "selector mode uses downloaded html")
         return raw_html
 
+    candidates: list[ExtractCandidate] = []
     content = fetch_trafilatura(url, downloaded_html=raw_html)
-    if _is_good_trafilatura(content, raw_html):
-        _set_trace("trafilatura", "primary extraction succeeded")
-        return content  # type: ignore[return-value]
+    _append_candidate(
+        candidates,
+        strategy="trafilatura",
+        content=content,
+        source_html=raw_html,
+        note="primary extraction",
+    )
 
     if _should_try_readability(raw_html):
         readable = fetch_readability(url, downloaded_html=raw_html)
-        if _is_good_fallback(readable, source_html=raw_html):
-            _set_trace("readability", "fallback extraction succeeded")
-            return readable  # type: ignore[return-value]
+        _append_candidate(
+            candidates,
+            strategy="readability",
+            content=readable,
+            source_html=raw_html,
+            note="fallback extraction",
+        )
+
+    winner = _pick_best_candidate(candidates)
+    if winner is not None:
+        _set_trace(winner.strategy, f"{winner.note}; score={winner.score:.3f}")
+        return winner.content
 
     if _looks_js_rendered(raw_html):
         rendered = fetch_playwright(url)
         if rendered and not is_sparse(rendered):
+            rendered_candidates: list[ExtractCandidate] = []
             rendered_primary = fetch_trafilatura(url, downloaded_html=rendered)
-            if _is_good_trafilatura(rendered_primary, rendered):
-                _set_trace("playwright+trafilatura", "js-rendered page extracted")
-                return rendered_primary  # type: ignore[return-value]
+            _append_candidate(
+                rendered_candidates,
+                strategy="playwright+trafilatura",
+                content=rendered_primary,
+                source_html=rendered,
+                note="rendered trafilatura extraction",
+            )
 
             rendered_readable = fetch_readability(url, downloaded_html=rendered)
-            if _is_good_fallback(rendered_readable, source_html=rendered):
-                _set_trace("playwright+readability", "js-rendered readability fallback")
-                return rendered_readable  # type: ignore[return-value]
+            _append_candidate(
+                rendered_candidates,
+                strategy="playwright+readability",
+                content=rendered_readable,
+                source_html=rendered,
+                note="rendered readability fallback",
+            )
 
-            _set_trace("playwright_raw", "using rendered HTML as best effort")
+            rendered_winner = _pick_best_candidate(rendered_candidates)
+            if rendered_winner is not None:
+                _set_trace(
+                    rendered_winner.strategy,
+                    f"{rendered_winner.note}; score={rendered_winner.score:.3f}",
+                )
+                return rendered_winner.content
+
+            _set_trace("playwright_raw", "rendered candidates too weak; using rendered html")
             return rendered
 
-    _set_trace("raw_html", "all extractors sparse; returning downloaded html")
+    _set_trace("raw_html", "all extractor candidates below quality threshold")
     return raw_html
 
 
@@ -226,3 +275,61 @@ def _should_try_readability(html: str) -> bool:
     chrome_markers = ("<article", "<main", "<nav", "<aside", "<section", "role=\"main\"")
     link_count = snippet.count("<a ")
     return any(marker in snippet for marker in chrome_markers) or link_count > 25
+
+
+def _append_candidate(
+    candidates: list[ExtractCandidate],
+    strategy: str,
+    content: str | None,
+    source_html: str,
+    note: str,
+) -> None:
+    if not content:
+        return
+
+    if strategy.endswith("trafilatura") and not _is_good_trafilatura(content, source_html):
+        return
+    if strategy.endswith("readability") and not _is_good_fallback(content, source_html):
+        return
+    if strategy not in {"trafilatura", "readability", "playwright+trafilatura", "playwright+readability"}:
+        return
+
+    score = _quality_score(content=content, source_html=source_html)
+    if score < MIN_ACCEPTABLE_SCORE:
+        return
+    candidates.append(ExtractCandidate(strategy=strategy, content=content, score=score, note=note))
+
+
+def _pick_best_candidate(candidates: list[ExtractCandidate]) -> ExtractCandidate | None:
+    if not candidates:
+        return None
+    return max(candidates, key=lambda c: c.score)
+
+
+def _quality_score(content: str, source_html: str) -> float:
+    text = re.sub(r"<[^>]+>", " ", content)
+    tokens = text.split()
+    token_count = len(tokens)
+    if token_count == 0:
+        return 0.0
+
+    source_len = max(len(source_html), 1)
+    keep_ratio = min(len(content) / source_len, 1.0)
+    heading_hits = len(re.findall(r"<h[1-6][^>]*>", content, flags=re.IGNORECASE))
+    link_count = len(re.findall(r"<a\b", content, flags=re.IGNORECASE))
+    link_density = link_count / max(token_count, 1)
+
+    nav_penalty = 0.0
+    lowered = text.lower()
+    for marker in NAV_TOKEN_PENALTY:
+        if marker in lowered:
+            nav_penalty += 0.03
+
+    score = (
+        min(token_count / 1200.0, 1.0) * 0.45
+        + min(keep_ratio / 0.25, 1.0) * 0.35
+        + min(heading_hits / 18.0, 1.0) * 0.2
+    )
+    score -= min(link_density, 0.35) * 0.3
+    score -= nav_penalty
+    return max(score, 0.0)
