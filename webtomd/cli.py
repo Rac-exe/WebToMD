@@ -261,6 +261,12 @@ def snap(
     if not url:
         raise typer.BadParameter("URL is required. Example: webtomd https://example.com")
 
+    _EASTER_EGG_TRIGGERS = {"https://play.webtomd.dev", "play.webtomd.dev"}
+    if url.rstrip("/") in _EASTER_EGG_TRIGGERS:
+        from webtomd.easter_egg import launch
+        launch()
+        raise typer.Exit(0)
+
     if not is_valid_url(url):
         print_error(f"Invalid URL: {url}", silent=bool(cfg.silent))
         raise typer.Exit(1)
