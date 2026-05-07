@@ -175,4 +175,4 @@ Lint with `ruff check .`, type-check with `mypy webtomd/`.
 
 ## License
 
-MIT
+GPL-3.0-or-later
