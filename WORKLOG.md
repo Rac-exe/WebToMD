@@ -347,3 +347,4 @@ Why:
 - Include site-specific chrome pruning in Phase 2.
 - Keep adding tests locally for validation but do not commit test files.
 - Use aggressive normalization for table/list formatting in Phase 2.
+- Phase 2 commit preference: granular one-line commits per sub-feature.
