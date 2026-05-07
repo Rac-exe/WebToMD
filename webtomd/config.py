@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 if sys.version_info >= (3, 11):
@@ -22,6 +22,7 @@ class Config:
     silent: bool = False
     ai_provider: str | None = None   # overrides auto-detection
     ai_model: str | None = None      # overrides provider default
+    name_strategy: str = "deterministic"
 
 
 def load() -> Config:
@@ -39,6 +40,7 @@ def load() -> Config:
         silent=data.get("silent", False),
         ai_provider=data.get("ai_provider"),
         ai_model=data.get("ai_model"),
+        name_strategy=data.get("name_strategy", "deterministic"),
     )
 
 

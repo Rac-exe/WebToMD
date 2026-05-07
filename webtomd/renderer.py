@@ -32,6 +32,16 @@ def get_console(silent: bool = False) -> Console:
     return silent_console if silent else console
 
 
+def _safe_symbol(preferred: str, fallback: str) -> str:
+    """Return preferred glyph if stream encoding supports it."""
+    encoding = getattr(console.file, "encoding", None) or "utf-8"
+    try:
+        preferred.encode(encoding)
+        return preferred
+    except Exception:
+        return fallback
+
+
 def next_witty_message() -> str:
     """Return the next witty spinner line in a stable cycle."""
     return next(_witty_cycle)
@@ -58,21 +68,24 @@ def print_success(message: str, silent: bool = False) -> None:
     """Print a green success line."""
     if silent:
         return
-    console.print(f"[green]✓ {message}[/green]")
+    mark = _safe_symbol("✓", "OK")
+    console.print(f"[green]{mark} {message}[/green]")
 
 
 def print_warn(message: str, silent: bool = False) -> None:
     """Print an amber warning line."""
     if silent:
         return
-    console.print(f"[yellow]⚠ {message}[/yellow]")
+    mark = _safe_symbol("⚠", "WARN")
+    console.print(f"[yellow]{mark} {message}[/yellow]")
 
 
 def print_error(message: str, silent: bool = False) -> None:
     """Print a red error line."""
     if silent:
         return
-    console.print(f"[red]✗ {message}[/red]")
+    mark = _safe_symbol("✗", "ERR")
+    console.print(f"[red]{mark} {message}[/red]")
 
 
 def print_markdown_preview(markdown: str, silent: bool = False) -> None:

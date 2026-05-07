@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import typer
 
+from webtomd.ai.naming import suggest_filename_ai
 from webtomd import config as app_config
-from webtomd.converter import to_markdown
+from webtomd.converter import extract_title_hint, to_markdown
 from webtomd.fetcher import fetch
 from webtomd.output import open_in_editor, to_clipboard, to_file, to_stdout
 from webtomd.renderer import (
@@ -15,9 +17,10 @@ from webtomd.renderer import (
     print_error,
     print_markdown_preview,
     print_success,
+    print_warn,
     start_spinner,
 )
-from webtomd.utils import is_valid_url, url_to_filename
+from webtomd.utils import build_output_path, is_valid_url
 
 app = typer.Typer(
     name="webtomd",
@@ -26,10 +29,36 @@ app = typer.Typer(
 )
 
 
+def _is_interactive_terminal() -> bool:
+    """True when command is run in an interactive terminal session."""
+    return sys.stdout.isatty()
+
+
+def _resolve_output_mode(
+    explicit_output: str | None,
+    force_stdout: bool,
+    interactive: bool,
+) -> str:
+    """Resolve output mode to either 'file' or 'stdout'."""
+    if explicit_output:
+        return "file"
+    if force_stdout:
+        return "stdout"
+    if interactive:
+        return "file"
+    return "stdout"
+
+
 @app.command()
 def snap(
     url: str | None = typer.Argument(None, help="URL to convert"),
     output: str = typer.Option(None, "-o", "--output", help="Save to file"),
+    stdout: bool = typer.Option(False, "--stdout", help="Force stdout output"),
+    name_strategy: str | None = typer.Option(
+        None,
+        "--name-strategy",
+        help="Filename strategy: deterministic | ai",
+    ),
     copy: bool | None = typer.Option(None, "--copy/--no-copy", help="Copy to clipboard"),
     silent: bool | None = typer.Option(None, "--silent/--no-silent", help="No animations (pipe-safe)"),
     configure: bool = typer.Option(False, "--configure", help="Interactive AI provider setup"),
@@ -47,7 +76,16 @@ def snap(
         raise typer.BadParameter("URL is required. Example: webtomd https://example.com")
 
     cfg = app_config.load()
-    cfg = app_config.merge(cfg, copy=copy, silent=silent, metadata=metadata)
+    cfg = app_config.merge(
+        cfg,
+        copy=copy,
+        silent=silent,
+        metadata=metadata,
+        name_strategy=name_strategy,
+    )
+
+    if cfg.name_strategy not in {"deterministic", "ai"}:
+        raise typer.BadParameter("`--name-strategy` must be one of: deterministic, ai")
 
     if not is_valid_url(url):
         print_error(f"Invalid URL: {url}", silent=bool(cfg.silent))
@@ -62,20 +100,35 @@ def snap(
     if cfg.metadata:
         raise typer.BadParameter("`--metadata` lands in Phase 2.")
 
-    output_path: Path | None = None
-    if output:
-        output_path = Path(output)
-    elif cfg.output_dir:
-        output_path = Path(cfg.output_dir) / f"{url_to_filename(url)}.md"
+    output_mode = _resolve_output_mode(
+        explicit_output=output,
+        force_stdout=stdout,
+        interactive=_is_interactive_terminal(),
+    )
 
     with start_spinner(next_witty_message(), silent=bool(cfg.silent)):
         html = fetch(url=url)
+        title_hint = extract_title_hint(html)
         markdown = to_markdown(html=html, url=url, metadata=False)
 
     token_count = len(markdown.split())
     print_success(f"Converted to Markdown ({token_count} tokens)", silent=bool(cfg.silent))
 
-    if output_path:
+    if output_mode == "file":
+        if output:
+            output_path = Path(output)
+        else:
+            base_dir = Path(cfg.output_dir) if cfg.output_dir else Path.cwd()
+            chosen_hint = title_hint
+            if cfg.name_strategy == "ai":
+                try:
+                    chosen_hint = suggest_filename_ai(title_hint=title_hint, markdown=markdown)
+                except Exception as exc:
+                    print_warn(
+                        f"AI naming unavailable ({exc}). Falling back to deterministic naming.",
+                        silent=bool(cfg.silent),
+                    )
+            output_path = build_output_path(base_dir, url=url, title_hint=chosen_hint)
         saved_path = to_file(markdown, output_path)
         print_success(f"Saved to {saved_path}", silent=bool(cfg.silent))
         if bool(cfg.copy):

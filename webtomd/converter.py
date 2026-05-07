@@ -9,6 +9,27 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 
 
+def extract_title_hint(html: str, selector: str | None = None) -> str | None:
+    """Extract a best-effort title from HTML for filename generation."""
+    source_html = _sanitize_html(html)
+    soup = BeautifulSoup(source_html, "html.parser")
+
+    if selector:
+        selected = soup.select_one(selector)
+        if selected is not None:
+            heading = selected.find(["h1", "h2", "h3"])
+            if heading and heading.get_text(strip=True):
+                return heading.get_text(strip=True)
+
+    if soup.title and soup.title.get_text(strip=True):
+        return soup.title.get_text(strip=True)
+
+    h1 = soup.find("h1")
+    if h1 and h1.get_text(strip=True):
+        return h1.get_text(strip=True)
+    return None
+
+
 def to_markdown(
     html: str,
     url: str | None = None,
@@ -27,26 +48,13 @@ def to_markdown(
         Clean Markdown string.
     """
     source_html = _sanitize_html(html)
-    title = "Untitled"
+    title = extract_title_hint(source_html, selector=selector) or "Untitled"
 
     if selector:
         soup = BeautifulSoup(source_html, "html.parser")
         selected = soup.select_one(selector)
         if selected is not None:
             source_html = str(selected)
-            heading = selected.find(["h1", "h2", "h3"])
-            if heading and heading.get_text(strip=True):
-                title = heading.get_text(strip=True)
-        elif soup.title and soup.title.get_text(strip=True):
-            title = soup.title.get_text(strip=True)
-    else:
-        soup = BeautifulSoup(source_html, "html.parser")
-        if soup.title and soup.title.get_text(strip=True):
-            title = soup.title.get_text(strip=True)
-        else:
-            h1 = soup.find("h1")
-            if h1 and h1.get_text(strip=True):
-                title = h1.get_text(strip=True)
 
     markdown = md(
         source_html,
