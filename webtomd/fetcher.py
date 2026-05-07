@@ -46,6 +46,7 @@ class ExtractCandidate:
 
 
 LAST_FETCH_TRACE: FetchTrace = FetchTrace(strategy="none", note="")
+_DOWNLOAD_CACHE: dict[str, str] = {}
 
 
 def get_last_fetch_trace() -> FetchTrace:
@@ -56,6 +57,11 @@ def get_last_fetch_trace() -> FetchTrace:
 def _set_trace(strategy: str, note: str = "") -> None:
     global LAST_FETCH_TRACE
     LAST_FETCH_TRACE = FetchTrace(strategy=strategy, note=note)
+
+
+def clear_cache() -> None:
+    """Clear the in-memory download cache."""
+    _DOWNLOAD_CACHE.clear()
 
 
 def fetch(url: str, selector: str | None = None) -> str:
@@ -235,6 +241,10 @@ def fetch_trafilatura(
 
 def _download_html(url: str, timeout_s: float = DEFAULT_DOWNLOAD_TIMEOUT_S) -> str | None:
     """Download HTML via trafilatura and httpx in parallel, take first success."""
+    cached = _DOWNLOAD_CACHE.get(url)
+    if cached is not None:
+        return cached
+
     traf_timeout = min(timeout_s, FETCH_STAGE_TIMEOUT_S)
     httpx_timeout = min(timeout_s + 2.0, FETCH_STAGE_TIMEOUT_S)
 
@@ -266,6 +276,7 @@ def _download_html(url: str, timeout_s: float = DEFAULT_DOWNLOAD_TIMEOUT_S) -> s
             try:
                 result = future.result(timeout=1)
                 if result:
+                    _DOWNLOAD_CACHE[url] = result
                     return result
             except Exception:
                 continue
