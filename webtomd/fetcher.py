@@ -19,6 +19,7 @@ READABILITY_STAGE_TIMEOUT_S = 10.0
 PLAYWRIGHT_STAGE_TIMEOUT_S = 20.0
 TRAFILATURA_MIN_KEEP_RATIO = 0.08
 MIN_ACCEPTABLE_SCORE = 0.18
+HTML_SIZE_CAP_BYTES = 500_000
 NAV_TOKEN_PENALTY = (
     "skip to content",
     "cookie settings",
@@ -61,6 +62,8 @@ def fetch(url: str, selector: str | None = None) -> str:
     """Fetch URL and return extracted HTML content.
 
     Escalates through the fallback chain automatically on sparse results.
+    Uses parallel extraction for trafilatura + readability when both are
+    applicable, and skips trafilatura entirely on bloated pages (>500KB).
     """
     raw_html = _download_html(url)
     if is_sparse(raw_html) or raw_html is None:
@@ -73,23 +76,11 @@ def fetch(url: str, selector: str | None = None) -> str:
         return raw_html
 
     stage = _resolve_stage_timeouts(url=url, raw_html=raw_html)
+    is_bloated = len(raw_html) > HTML_SIZE_CAP_BYTES
 
     candidates: list[ExtractCandidate] = []
-    content = _invoke_timeout_kw(
-        fetch_trafilatura,
-        url,
-        downloaded_html=raw_html,
-        timeout_s=stage["extract_timeout_s"],
-    )
-    _append_candidate(
-        candidates,
-        strategy="trafilatura",
-        content=content,
-        source_html=raw_html,
-        note="primary extraction",
-    )
 
-    if _should_try_readability(raw_html):
+    if is_bloated:
         readable = _invoke_timeout_kw(
             fetch_readability,
             url,
@@ -101,7 +92,54 @@ def fetch(url: str, selector: str | None = None) -> str:
             strategy="readability",
             content=readable,
             source_html=raw_html,
-            note="fallback extraction",
+            note="size-cap bypass; skipped trafilatura",
+        )
+    elif _should_try_readability(raw_html):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            traf_future = pool.submit(
+                _invoke_timeout_kw,
+                fetch_trafilatura,
+                url,
+                downloaded_html=raw_html,
+                timeout_s=stage["extract_timeout_s"],
+            )
+            read_future = pool.submit(
+                _invoke_timeout_kw,
+                fetch_readability,
+                url,
+                downloaded_html=raw_html,
+                timeout_s=stage["readability_timeout_s"],
+            )
+            traf_result = _safe_future_result(traf_future, stage["extract_timeout_s"] + 2)
+            read_result = _safe_future_result(read_future, stage["readability_timeout_s"] + 2)
+
+        _append_candidate(
+            candidates,
+            strategy="trafilatura",
+            content=traf_result,
+            source_html=raw_html,
+            note="parallel extraction",
+        )
+        _append_candidate(
+            candidates,
+            strategy="readability",
+            content=read_result,
+            source_html=raw_html,
+            note="parallel extraction",
+        )
+    else:
+        content = _invoke_timeout_kw(
+            fetch_trafilatura,
+            url,
+            downloaded_html=raw_html,
+            timeout_s=stage["extract_timeout_s"],
+        )
+        _append_candidate(
+            candidates,
+            strategy="trafilatura",
+            content=content,
+            source_html=raw_html,
+            note="primary extraction",
         )
 
     winner = _pick_best_candidate(candidates)
@@ -117,32 +155,37 @@ def fetch(url: str, selector: str | None = None) -> str:
         )
         if rendered and not is_sparse(rendered):
             rendered_candidates: list[ExtractCandidate] = []
-            rendered_primary = _invoke_timeout_kw(
-                fetch_trafilatura,
-                url,
-                downloaded_html=rendered,
-                timeout_s=stage["extract_timeout_s"],
-            )
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                rt_future = pool.submit(
+                    _invoke_timeout_kw,
+                    fetch_trafilatura,
+                    url,
+                    downloaded_html=rendered,
+                    timeout_s=stage["extract_timeout_s"],
+                )
+                rr_future = pool.submit(
+                    _invoke_timeout_kw,
+                    fetch_readability,
+                    url,
+                    downloaded_html=rendered,
+                    timeout_s=stage["readability_timeout_s"],
+                )
+                rt_result = _safe_future_result(rt_future, stage["extract_timeout_s"] + 2)
+                rr_result = _safe_future_result(rr_future, stage["readability_timeout_s"] + 2)
+
             _append_candidate(
                 rendered_candidates,
                 strategy="playwright+trafilatura",
-                content=rendered_primary,
+                content=rt_result,
                 source_html=rendered,
-                note="rendered trafilatura extraction",
-            )
-
-            rendered_readable = _invoke_timeout_kw(
-                fetch_readability,
-                url,
-                downloaded_html=rendered,
-                timeout_s=stage["readability_timeout_s"],
+                note="rendered parallel extraction",
             )
             _append_candidate(
                 rendered_candidates,
                 strategy="playwright+readability",
-                content=rendered_readable,
+                content=rr_result,
                 source_html=rendered,
-                note="rendered readability fallback",
+                note="rendered parallel extraction",
             )
 
             rendered_winner = _pick_best_candidate(rendered_candidates)
@@ -158,6 +201,14 @@ def fetch(url: str, selector: str | None = None) -> str:
 
     _set_trace("raw_html", "all extractor candidates below quality threshold")
     return raw_html
+
+
+def _safe_future_result(future, timeout_s: float):
+    """Extract result from a future, returning None on any failure."""
+    try:
+        return future.result(timeout=timeout_s)
+    except Exception:
+        return None
 
 
 def fetch_trafilatura(
@@ -321,13 +372,13 @@ def _resolve_stage_timeouts(url: str, raw_html: str) -> dict[str, float]:
     html_len = len(raw_html)
     script_count = raw_html.lower().count("<script")
     heavy_host = any(h in url.lower() for h in ("minecraft.net",))
-    is_heavy = heavy_host or html_len > 450_000 or script_count > 120
+    is_heavy = heavy_host or html_len > 300_000 or script_count > 80
 
     if is_heavy:
         return {
-            "extract_timeout_s": 8.0,
-            "readability_timeout_s": 7.0,
-            "playwright_timeout_s": 12.0,
+            "extract_timeout_s": 6.0,
+            "readability_timeout_s": 5.0,
+            "playwright_timeout_s": 10.0,
         }
 
     return {
