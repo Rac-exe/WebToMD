@@ -164,6 +164,7 @@ def _drop_css_noise(markdown: str) -> str:
 def _prune_structural_noise(soup: BeautifulSoup) -> None:
     """Drop obvious chrome/sidebar/cookie shells before conversion."""
     has_primary_content = bool(soup.find(["main", "article"]))
+    doc_text_len = len(soup.get_text(" ", strip=True))
     structural_selectors = [
         "footer",
         "aside",
@@ -186,8 +187,7 @@ def _prune_structural_noise(soup: BeautifulSoup) -> None:
 
     for selector in selector_groups:
         for node in soup.select(selector):
-            # Keep unusually large blocks to avoid deleting real page content.
-            if len(node.get_text(" ", strip=True)) < 2_000:
+            if _should_prune_node(node, has_primary_content=has_primary_content, doc_text_len=doc_text_len):
                 node.decompose()
 
     for tag in soup.find_all(["a", "button", "span", "div", "p"]):
@@ -202,8 +202,43 @@ def _prune_structural_noise(soup: BeautifulSoup) -> None:
             "copy page",
             "sign up",
             "open app",
-        }:
+        } and len(text) <= 20:
             tag.decompose()
+
+
+def _should_prune_node(node, has_primary_content: bool, doc_text_len: int) -> bool:
+    """Conservative pruning guardrails to avoid deleting real content sections."""
+    text_len = len(node.get_text(" ", strip=True))
+    if text_len == 0:
+        return True
+
+    # Never remove a container that wraps a canonical content region.
+    if node.find(["main", "article", "section"]):
+        return False
+
+    heading_count = len(node.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]))
+    para_count = len(node.find_all("p"))
+    link_count = len(node.find_all("a"))
+
+    if heading_count >= 3 or para_count >= 8:
+        return False
+
+    # When page has no explicit main/article, be extra conservative.
+    if not has_primary_content:
+        if text_len > 600:
+            return False
+        return link_count >= 4
+
+    # Keep nodes that occupy substantial share of document content.
+    if doc_text_len > 0 and text_len >= max(int(doc_text_len * 0.35), 2500):
+        return False
+
+    # Drop mostly-link containers (typical nav/sidebar shells).
+    if link_count >= 5 and para_count <= 2 and heading_count <= 1:
+        return True
+
+    # Otherwise only prune clearly short utility blocks.
+    return text_len < 350
 
 
 def _drop_markdown_chrome(markdown: str) -> str:
