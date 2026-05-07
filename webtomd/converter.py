@@ -99,6 +99,7 @@ def _normalize_numbering(markdown: str) -> str:
     - "- 1Open app" -> "- 1. Open app"
     - "1Install" -> "1. Install"
     """
+    markdown = re.sub(r"(^|\s)(\d+)\.\s+(st|nd|rd|th)-", r"\1\2\3-", markdown, flags=re.IGNORECASE)
     lines = markdown.splitlines()
     normalized: list[str] = []
 
@@ -253,16 +254,31 @@ def _drop_markdown_chrome(markdown: str) -> str:
         "copy page",
     )
     cleaned: list[str] = []
+    link_wall_streak = 0
     for line in markdown.splitlines():
         stripped = line.strip().lower()
         if stripped in noise_tokens:
             continue
-        # Drop very long navigation lines composed of many markdown links.
-        if line.count("](") >= 10 and len(line) > 180:
+
+        link_count = line.count("](")
+        is_link_wall = link_count >= 6 and len(line.strip()) > 120
+        if is_link_wall:
+            link_wall_streak += 1
+        else:
+            link_wall_streak = 0
+
+        # Keep at most one line from long runs of link walls.
+        if is_link_wall and link_wall_streak >= 2:
             continue
+
+        # Drop isolated huge navigation rows composed almost entirely of links.
+        if link_count >= 10 and len(line) > 180:
+            continue
+
         cleaned.append(line)
 
-    return _dedupe_adjacent_lines("\n".join(cleaned))
+    reduced = _collapse_duplicate_lines("\n".join(cleaned))
+    return _dedupe_adjacent_lines(reduced)
 
 
 def _dedupe_adjacent_lines(markdown: str) -> str:
@@ -273,4 +289,21 @@ def _dedupe_adjacent_lines(markdown: str) -> str:
             continue
         out.append(line)
         prev = line
+    return "\n".join(out)
+
+
+def _collapse_duplicate_lines(markdown: str) -> str:
+    """Remove repeated lines that recur in short proximity."""
+    lines = markdown.splitlines()
+    recent: list[str] = []
+    out: list[str] = []
+    for line in lines:
+        key = line.strip()
+        if key and key in recent:
+            continue
+        out.append(line)
+        if key:
+            recent.append(key)
+            if len(recent) > 6:
+                recent.pop(0)
     return "\n".join(out)
