@@ -14,7 +14,18 @@ from webtomd.renderer import print_warn
 
 def to_stdout(markdown: str) -> None:
     """Print markdown to stdout."""
-    print(markdown)
+    text = markdown if markdown.endswith("\n") else f"{markdown}\n"
+    try:
+        # Normal text path (works when stdout encoding can represent characters).
+        sys.stdout.write(text)
+    except UnicodeEncodeError:
+        # Windows terminals/pipes can expose non-UTF stdout encodings (e.g. cp1252).
+        # Write UTF-8 bytes directly so markdown emission never crashes.
+        if hasattr(sys.stdout, "buffer"):
+            sys.stdout.buffer.write(text.encode("utf-8", errors="replace"))
+        else:
+            sys.stdout.write(text.encode("ascii", errors="replace").decode("ascii"))
+    sys.stdout.flush()
 
 
 def to_file(markdown: str, path: Path) -> Path:

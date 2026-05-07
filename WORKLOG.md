@@ -348,3 +348,45 @@ Why:
 - Keep adding tests locally for validation but do not commit test files.
 - Use aggressive normalization for table/list formatting in Phase 2.
 - Phase 2 commit preference: granular one-line commits per sub-feature.
+
+## 2026-05-07 21:39:42 +05:30 — Full 5-link command matrix rerun (manual terminal execution)
+
+### User request
+- Re-run all currently working commands against the same 5 benchmark URLs.
+- Keep `.md` output artifacts for direct manual inspection.
+- Provide full analysis of command behavior and content quality.
+
+### Commands executed across all 5 URLs
+- `python -m webtomd.cli --silent <url> -o <file>`
+- `python -m webtomd.cli --silent --stdout <url>`
+- `python -m webtomd.cli --silent <url>` (plain mode in this non-interactive shell, redirected to file)
+- `python -m webtomd.cli --silent --name-strategy deterministic <url>` (redirected)
+- `python -m webtomd.cli --silent --name-strategy ai <url>` (redirected)
+- `python -m webtomd.cli --silent --stdout --copy <url>` (copy-mode status check + captured output)
+
+### Output location
+- `eval-runs/five-links-full-20260507-212944/`
+  - `explicit/` (clean baseline `-o` files)
+  - `stdout/`
+  - `plain/`
+  - `name-deterministic/`
+  - `name-ai/`
+  - `logs/timings.csv`
+  - `logs/content-summary.json`
+
+### Runtime observations
+- 4 URLs consistently complete in ~3–8s across modes.
+- Minecraft homepage remains the outlier at ~113–125s due to very heavy page/chrome.
+
+### Quality observations
+- `explicit/` outputs are the most reliable representation for manual quality checks.
+- Redirected stdout/plain/name-strategy files in PowerShell required UTF-8 normalization for easier viewing.
+- Even after normalization, redirected files can show symbol drift on some Unicode characters vs explicit file output.
+- Core extracted structure remains present across modes (headings/list counts align closely).
+
+### Site-level quality snapshot from explicit mode
+- Minecraft (`www-minecraft-net-en-us.md`): very nav-heavy and large; content present but significant chrome noise.
+- Linear My Issues (`linear-app-docs-my-issues.md`): main doc content captured with good headings/lists; some sidebar/menu noise remains.
+- Linear Reviews (`linear-app-docs-diffs.md`): strong capture of primary sections; still includes docs shell links.
+- Wikipedia Egyptians (`en-wikipedia-org-wiki-egyptians.md`): rich content captured; includes heavy infobox/reference density as expected.
+- Claude Skills Overview (`platform-claude-com-docs-en-agents-and-tools-agent-skills-overview.md`): core page captured but retains docs navigation and cookie/settings shell content.
