@@ -9,6 +9,10 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 
 
+class SelectorNotFoundError(ValueError):
+    """Raised when a CSS selector does not match any element."""
+
+
 def extract_title_hint(html: str, selector: str | None = None) -> str | None:
     """Extract a best-effort title from HTML for filename generation."""
     source_html = _sanitize_html(html)
@@ -53,8 +57,9 @@ def to_markdown(
     if selector:
         soup = BeautifulSoup(source_html, "html.parser")
         selected = soup.select_one(selector)
-        if selected is not None:
-            source_html = str(selected)
+        if selected is None:
+            raise SelectorNotFoundError(f"No element matched selector: {selector}")
+        source_html = str(selected)
 
     markdown = md(
         source_html,
@@ -64,6 +69,7 @@ def to_markdown(
     )
     markdown = _normalize_numbering(markdown)
     markdown = _drop_css_noise(markdown)
+    markdown = _drop_markdown_chrome(markdown)
     markdown = re.sub(r"\n{3,}", "\n\n", markdown).strip()
 
     if metadata and url:
@@ -98,7 +104,7 @@ def _normalize_numbering(markdown: str) -> str:
 
     heading_re = re.compile(r"^(#{1,6}\s+)(\d+)([A-Za-z].*)$")
     list_re = re.compile(r"^(\s*[-*]\s+)(\d+)([A-Za-z].*)$")
-    plain_re = re.compile(r"^(\s*)(\d+)([A-Za-z].*)$")
+    plain_re = re.compile(r"^(\s*)(\d+)([A-Z][A-Za-z].*)$")
 
     for line in lines:
         m = heading_re.match(line)
@@ -126,6 +132,7 @@ def _sanitize_html(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup.find_all(["script", "style", "noscript", "template"]):
         tag.decompose()
+    _prune_structural_noise(soup)
     return str(soup)
 
 
@@ -152,3 +159,83 @@ def _drop_css_noise(markdown: str) -> str:
         cleaned.append(line)
 
     return "\n".join(cleaned)
+
+
+def _prune_structural_noise(soup: BeautifulSoup) -> None:
+    """Drop obvious chrome/sidebar/cookie shells before conversion."""
+    has_primary_content = bool(soup.find(["main", "article"]))
+    structural_selectors = [
+        "footer",
+        "aside",
+        "[role='navigation']",
+        "[class*='sidebar' i]",
+        "[id*='sidebar' i]",
+        "[class*='breadcrumbs' i]",
+        "[id*='breadcrumbs' i]",
+    ]
+    if has_primary_content:
+        structural_selectors.extend(["nav", "header"])
+
+    selector_groups = [
+        *structural_selectors,
+        "[id*='cookie' i]",
+        "[class*='cookie' i]",
+        "[id*='consent' i]",
+        "[class*='consent' i]",
+    ]
+
+    for selector in selector_groups:
+        for node in soup.select(selector):
+            # Keep unusually large blocks to avoid deleting real page content.
+            if len(node.get_text(" ", strip=True)) < 2_000:
+                node.decompose()
+
+    for tag in soup.find_all(["a", "button", "span", "div", "p"]):
+        text = tag.get_text(" ", strip=True).lower()
+        if text in {
+            "skip to content",
+            "skip to main content",
+            "cookie settings",
+            "accept all cookies",
+            "reject all cookies",
+            "loading...",
+            "copy page",
+            "sign up",
+            "open app",
+        }:
+            tag.decompose()
+
+
+def _drop_markdown_chrome(markdown: str) -> str:
+    """Drop residual markdown lines that are usually site-shell noise."""
+    noise_tokens = (
+        "skip to content",
+        "skip to main content",
+        "cookie settings",
+        "accept all cookies",
+        "reject all cookies",
+        "loading...",
+        "copy page",
+    )
+    cleaned: list[str] = []
+    for line in markdown.splitlines():
+        stripped = line.strip().lower()
+        if stripped in noise_tokens:
+            continue
+        # Drop very long navigation lines composed of many markdown links.
+        if line.count("](") >= 10 and len(line) > 180:
+            continue
+        cleaned.append(line)
+
+    return _dedupe_adjacent_lines("\n".join(cleaned))
+
+
+def _dedupe_adjacent_lines(markdown: str) -> str:
+    out: list[str] = []
+    prev = None
+    for line in markdown.splitlines():
+        if prev is not None and line.strip() and line.strip() == prev.strip():
+            continue
+        out.append(line)
+        prev = line
+    return "\n".join(out)

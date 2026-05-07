@@ -390,3 +390,60 @@ Why:
 - Linear Reviews (`linear-app-docs-diffs.md`): strong capture of primary sections; still includes docs shell links.
 - Wikipedia Egyptians (`en-wikipedia-org-wiki-egyptians.md`): rich content captured; includes heavy infobox/reference density as expected.
 - Claude Skills Overview (`platform-claude-com-docs-en-agents-and-tools-agent-skills-overview.md`): core page captured but retains docs navigation and cookie/settings shell content.
+
+## 2026-05-07 23:07:10 +05:30 — Quality Improvements plan implementation
+
+### Commit-first step completed
+- Created focused commit for already-finished changes only:
+  - `webtomd/output.py` stdout hardening
+  - this worklog benchmark entry
+- Commit: `e2832c4`
+- Kept `eval-runs/` and `tests/` artifacts uncommitted.
+
+### Code changes implemented
+- `webtomd/output.py`
+  - Added stdout UTF-8 reconfigure attempt with safe fallback path to avoid Windows encoding crashes.
+- `webtomd/fetcher.py`
+  - Implemented staged fallback chain with strategy trace:
+    1. trafilatura
+    2. readability (gated by page-shape heuristic)
+    3. playwright (optional, JS-heavy trigger only)
+    4. raw HTML best-effort fallback
+  - Added timeout wrappers for fetch/extract stages to avoid long stalls.
+  - Added `get_last_fetch_trace()` for strategy visibility.
+  - Added selector mode behavior to keep raw HTML for CSS selection pass.
+- `webtomd/converter.py`
+  - Added `SelectorNotFoundError` and strict selector miss handling.
+  - Added conservative pre-conversion pruning for cookie/consent/sidebar/boilerplate.
+  - Added markdown-level chrome filtering + duplicate-line cleanup.
+  - Tightened numbering normalization to avoid `3rd-party` -> `3. rd-party` regression.
+- `webtomd/cli.py`
+  - Enabled `--selector` (removed Phase-2 guard).
+  - Wired selector into fetch/title/markdown conversion path.
+  - Added friendly selector-not-found error.
+  - Included fetch strategy in conversion success message.
+
+### Validation
+- Local tests:
+  - `python -m pytest tests/test_fetcher.py tests/test_converter.py tests/test_output.py tests/test_cli_modes.py tests/test_naming.py`
+  - Result: `23 passed`.
+- Lint diagnostics on edited source files: no linter errors.
+- Selector check:
+  - `--selector body` succeeds.
+  - invalid selector fails with user-friendly `No element matched selector: ...` message.
+
+### Post-change benchmark rerun
+- Final benchmark artifacts:
+  - `eval-runs/five-links-post-improvements-20260507-230411/`
+  - `logs/timings.csv`
+  - `logs/content-summary.json`
+- Runtime:
+  - 4 links complete in typical single-digit seconds.
+  - Minecraft remains the slowest link but now finishes with richer output.
+
+### Output quality snapshot (post-change explicit mode)
+- Minecraft: `1075` lines, `43` headings, `139` list items (substantially richer than over-pruned intermediate run).
+- Linear My Issues: `75` lines, `7` headings, `16` list items (cleaner with reduced shell noise).
+- Linear Reviews: `133` lines, `12` headings (retains core content with less docs chrome).
+- Wikipedia Egyptians: `1110` lines, `35` headings (strong main-content retention).
+- Claude Skills Overview: `305` lines, `31` headings (cookie/loading shell markers removed in this run).

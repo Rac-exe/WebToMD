@@ -9,8 +9,8 @@ import typer
 
 from webtomd.ai.naming import suggest_filename_ai
 from webtomd import config as app_config
-from webtomd.converter import extract_title_hint, to_markdown
-from webtomd.fetcher import fetch
+from webtomd.converter import SelectorNotFoundError, extract_title_hint, to_markdown
+from webtomd.fetcher import fetch, get_last_fetch_trace
 from webtomd.output import open_in_editor, to_clipboard, to_file, to_stdout
 from webtomd.renderer import (
     next_witty_message,
@@ -95,8 +95,6 @@ def snap(
         raise typer.BadParameter("`--batch` lands in Phase 2.")
     if ai:
         raise typer.BadParameter("`--ai` lands in Phase 3.")
-    if selector:
-        raise typer.BadParameter("`--selector` lands in Phase 2.")
     if cfg.metadata:
         raise typer.BadParameter("`--metadata` lands in Phase 2.")
 
@@ -106,13 +104,20 @@ def snap(
         interactive=_is_interactive_terminal(),
     )
 
-    with start_spinner(next_witty_message(), silent=bool(cfg.silent)):
-        html = fetch(url=url)
-        title_hint = extract_title_hint(html)
-        markdown = to_markdown(html=html, url=url, metadata=False)
+    try:
+        with start_spinner(next_witty_message(), silent=bool(cfg.silent)):
+            html = fetch(url=url, selector=selector)
+            title_hint = extract_title_hint(html, selector=selector)
+            markdown = to_markdown(html=html, url=url, metadata=False, selector=selector)
+    except SelectorNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
     token_count = len(markdown.split())
-    print_success(f"Converted to Markdown ({token_count} tokens)", silent=bool(cfg.silent))
+    trace = get_last_fetch_trace()
+    print_success(
+        f"Converted to Markdown ({token_count} tokens) via {trace.strategy}",
+        silent=bool(cfg.silent),
+    )
 
     if output_mode == "file":
         if output:
