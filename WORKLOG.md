@@ -325,3 +325,22 @@ Why:
 - Add extraction-time timeout around trafilatura primary fetch.
 - Add doc-shell pruning heuristics for known doc portals (Linear, Claude docs, Wikipedia).
 - Add readability fallback before raw-html conversion for nav-heavy pages.
+
+## 2026-05-07 20:50:08 +05:30 — Commits created and Phase 2 planning kickoff
+
+### Commits completed
+- `84e5716` — Add auto-save defaults and pluggable filename strategies
+- `e49bcf2` — Document new output defaults and naming behavior
+
+### Commit constraints honored
+- Did not include `tests/` in these commits.
+- Did not include converted URL outputs in these commits.
+- Left evaluation artifacts and generated outputs untracked.
+
+### Phase 2 planning decisions captured
+- `--selector` should be implemented in next coding step (not deferred).
+- Phase 2 priority order:
+  1. fallback chain (readability + playwright),
+  2. stdin/batch features afterward.
+- Playwright install UX direction:
+  - trigger install on first actual playwright fallback need.
