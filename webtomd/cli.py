@@ -249,31 +249,43 @@ def _run_batch(
         print_error("Batch file is empty or contains only comments.")
         raise typer.Exit(1)
 
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
     from webtomd.renderer import console
 
     console.print(f"\n[bold cyan]Batch mode:[/bold cyan] {len(urls)} URLs\n")
 
     results = {"success": 0, "failed": 0}
-    for i, url in enumerate(urls, 1):
-        console.print(f"[dim][{i}/{len(urls)}][/dim] {url}")
-        if not is_valid_url(url):
-            print_error(f"  Invalid URL, skipping", silent=bool(cfg.silent))
-            results["failed"] += 1
-            continue
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("[green]{task.fields[ok]}[/green] ok [red]{task.fields[fail]}[/red] fail"),
+        console=console,
+        transient=False,
+    ) as progress:
+        task = progress.add_task("Converting...", total=len(urls), ok=0, fail=0)
+        for url in urls:
+            progress.update(task, description=f"[dim]{url[:60]}[/dim]")
+            if not is_valid_url(url):
+                results["failed"] += 1
+                progress.update(task, advance=1, fail=results["failed"])
+                continue
 
-        ok = _convert_single(
-            url,
-            cfg,
-            output=None,
-            stdout_flag=False,
-            selector=selector,
-            ai_mode=ai_mode,
-            open_after=open_after,
-        )
-        if ok:
-            results["success"] += 1
-        else:
-            results["failed"] += 1
+            ok = _convert_single(
+                url,
+                cfg,
+                output=None,
+                stdout_flag=False,
+                selector=selector,
+                ai_mode=ai_mode,
+                open_after=open_after,
+            )
+            if ok:
+                results["success"] += 1
+            else:
+                results["failed"] += 1
+            progress.update(task, advance=1, ok=results["success"], fail=results["failed"])
 
     console.print(f"\n[bold]Batch complete:[/bold] {results['success']} succeeded, {results['failed']} failed\n")
 
