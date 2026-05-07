@@ -207,22 +207,22 @@ def _run_batch(
 
 @app.command()
 def snap(
-    url: str | None = typer.Argument(None, help="URL to convert"),
-    output: str = typer.Option(None, "-o", "--output", help="Save to file"),
-    stdout: bool = typer.Option(False, "--stdout", help="Force stdout output"),
+    url: str | None = typer.Argument(None, help="URL to convert to Markdown"),
+    output: str = typer.Option(None, "-o", "--output", help="Save to a specific file path"),
+    stdout: bool = typer.Option(False, "--stdout", help="Force output to stdout instead of saving"),
     name_strategy: str | None = typer.Option(
         None,
         "--name-strategy",
-        help="Filename strategy: deterministic | ai",
+        help="Filename strategy: 'deterministic' or 'ai'",
     ),
-    copy: bool | None = typer.Option(None, "--copy/--no-copy", help="Copy to clipboard"),
-    silent: bool | None = typer.Option(None, "--silent/--no-silent", help="No animations (pipe-safe)"),
-    configure: bool = typer.Option(False, "--configure", help="Interactive AI provider setup"),
-    ai: str = typer.Option(None, "--ai", help="AI mode: summarize | tl;dr | translate | extract | qa"),
-    batch: str = typer.Option(None, "--batch", help="File of URLs to batch process"),
-    selector: str = typer.Option(None, "--selector", help="CSS selector to target specific content"),
-    metadata: bool | None = typer.Option(None, "--metadata/--no-metadata", help="Prepend YAML frontmatter"),
-    open_after: bool = typer.Option(False, "--open", help="Open output file in default editor"),
+    copy: bool | None = typer.Option(None, "--copy/--no-copy", help="Copy Markdown to clipboard"),
+    silent: bool | None = typer.Option(None, "--silent/--no-silent", help="Suppress spinners and preview (pipe-safe)"),
+    configure: bool = typer.Option(False, "--configure", help="Launch interactive AI provider setup wizard"),
+    ai: str = typer.Option(None, "--ai", help="AI post-processing mode: summarize, tl;dr, translate, extract, qa"),
+    batch: str = typer.Option(None, "--batch", help="Path to a file containing URLs (one per line)"),
+    selector: str = typer.Option(None, "--selector", help="CSS selector to extract specific page content"),
+    metadata: bool | None = typer.Option(None, "--metadata/--no-metadata", help="Prepend YAML frontmatter with title, URL, and date"),
+    open_after: bool = typer.Option(False, "--open", help="Open the saved file in your default editor"),
 ) -> None:
     """Convert any URL to clean Markdown."""
 
