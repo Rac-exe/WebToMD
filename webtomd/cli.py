@@ -49,6 +49,15 @@ def _resolve_output_mode(
     return "stdout"
 
 
+def _format_trace(trace_strategy: str, trace_note: str) -> str:
+    if not trace_note:
+        return f"via {trace_strategy}"
+    brief = trace_note.strip()
+    if len(brief) > 90:
+        brief = brief[:87].rstrip() + "..."
+    return f"via {trace_strategy} ({brief})"
+
+
 @app.command()
 def snap(
     url: str | None = typer.Argument(None, help="URL to convert"),
@@ -115,7 +124,7 @@ def snap(
     token_count = len(markdown.split())
     trace = get_last_fetch_trace()
     print_success(
-        f"Converted to Markdown ({token_count} tokens) via {trace.strategy}",
+        f"Converted to Markdown ({token_count} tokens) {_format_trace(trace.strategy, trace.note)}",
         silent=bool(cfg.silent),
     )
 
