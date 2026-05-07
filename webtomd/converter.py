@@ -61,6 +61,8 @@ def to_markdown(
             raise SelectorNotFoundError(f"No element matched selector: {selector}")
         source_html = str(selected)
 
+    source_html = _fix_tables(source_html)
+
     markdown = md(
         source_html,
         heading_style="ATX",
@@ -89,6 +91,79 @@ def _build_frontmatter(title: str, url: str) -> str:
         f'date: "{today}"\n'
         "---"
     )
+
+
+def _fix_tables(html: str) -> str:
+    """Normalize HTML tables so markdownify emits proper pipe-tables.
+
+    - Ensures <thead>/<tbody> structure exists
+    - Strips block-level tags from cells (collapses to inline text)
+    - Converts layout tables (no <th>, used for visual layout) to plain <div> text
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    changed = False
+
+    for table in soup.find_all("table"):
+        headers = table.find_all("th")
+        rows = table.find_all("tr")
+
+        if not rows:
+            continue
+
+        if not headers:
+            cell_counts = [len(row.find_all(["td", "th"])) for row in rows]
+            all_single_col = all(c <= 1 for c in cell_counts)
+            if all_single_col or len(rows) <= 1:
+                replacement = soup.new_tag("div")
+                for row in rows:
+                    for cell in row.find_all(["td", "th"]):
+                        p = soup.new_tag("p")
+                        p.string = cell.get_text(" ", strip=True)
+                        replacement.append(p)
+                table.replace_with(replacement)
+                changed = True
+                continue
+
+            first_row = rows[0]
+            first_cells = first_row.find_all("td")
+            if first_cells:
+                thead = soup.new_tag("thead")
+                new_tr = soup.new_tag("tr")
+                for td in first_cells:
+                    th = soup.new_tag("th")
+                    th.string = td.get_text(" ", strip=True)
+                    new_tr.append(th)
+                thead.append(new_tr)
+                first_row.decompose()
+                table.insert(0, thead)
+                changed = True
+
+        if not table.find("thead"):
+            thead_tag = soup.new_tag("thead")
+            first_header_row = table.find("tr")
+            if first_header_row and first_header_row.find("th"):
+                first_header_row.wrap(thead_tag)
+                changed = True
+
+        if not table.find("tbody"):
+            data_rows = [
+                tr for tr in table.find_all("tr", recursive=False)
+                if tr.parent.name != "thead"
+            ]
+            if data_rows:
+                tbody = soup.new_tag("tbody")
+                for dr in data_rows:
+                    tbody.append(dr.extract())
+                table.append(tbody)
+                changed = True
+
+        for cell in table.find_all(["td", "th"]):
+            block_children = cell.find_all(["p", "div", "ul", "ol", "br"])
+            if block_children:
+                cell.string = cell.get_text(" ", strip=True)
+                changed = True
+
+    return str(soup) if changed else html
 
 
 def _normalize_numbering(markdown: str) -> str:
