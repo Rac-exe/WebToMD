@@ -21,6 +21,8 @@ pip install webtomd
 - **Auto-save** — interactive terminals save files; piped runs output to stdout
 - **Smart filenames** — deterministic or AI-assisted naming
 - **Clipboard** — copy output with `--copy`
+- **stdin support** — pipe HTML directly via `curl ... | webtomd -`
+- **Recursive crawl** — `--depth N` discovers and converts same-domain linked pages
 - **Clean output** — strips nav, sidebars, cookie banners, CSS noise, duplicate content
 - **Cross-platform** — Windows, macOS, Linux with encoding-safe output
 
@@ -35,6 +37,12 @@ webtomd https://example.com/article -o article.md
 
 # Force stdout (useful for pipelines)
 webtomd https://example.com/article --stdout
+
+# Pipe HTML from stdin
+curl -s https://example.com | webtomd - --stdout
+
+# Auto-detect piped stdin (no URL needed)
+curl -s https://example.com | webtomd --stdout
 
 # Pipe-friendly (auto-detects non-interactive terminal)
 webtomd https://example.com/article | grep "##"
@@ -65,6 +73,9 @@ webtomd https://example.com --open
 
 # Silent mode (no spinners, no preview — pipe-safe)
 webtomd https://example.com --silent -o out.md
+
+# Crawl linked pages (same-domain, depth 2)
+webtomd https://example.com --depth 2
 
 # Filename strategy
 webtomd https://example.com --name-strategy deterministic
