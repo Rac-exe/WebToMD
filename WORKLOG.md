@@ -344,3 +344,6 @@ Why:
   2. stdin/batch features afterward.
 - Playwright install UX direction:
   - trigger install on first actual playwright fallback need.
+- Include site-specific chrome pruning in Phase 2.
+- Keep adding tests locally for validation but do not commit test files.
+- Use aggressive normalization for table/list formatting in Phase 2.
