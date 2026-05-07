@@ -506,3 +506,62 @@ Why:
 - interpretation:
   - quality/guardrail changes improved structural retention and cleanup;
   - latency is still bounded and predictable but not yet materially faster on heavy pages.
+
+## 2026-05-07 23:31:00 +05:30 — Phase 3 implementation (AI + configure + batch + metadata + easter egg)
+
+### Commit sequence
+- `c44b9ec` — Implement AI provider runtime with multi-provider support and graceful fallback
+- `f1a68e9` — Implement interactive --configure flow with provider setup wizard
+- `91c3c72` — Wire --ai, --configure, --batch, and --metadata into CLI lifecycle
+- `9287688` — Implement space galaxy shooter easter egg with hidden trigger
+
+### What changed
+
+#### AI Provider Runtime (`webtomd/ai/`)
+- `providers.py`: Implemented all 5 provider classes (Anthropic, OpenAI, Gemini, Groq, Ollama) with real SDK calls.
+- `detector.py`: Implemented `detect()` with env-var priority chain and optional `provider_override` from config.
+- `__init__.py`: Added `process_ai()` entry point and `AIUnavailableError` for graceful degradation.
+- `prompts.py`: Already complete from earlier scaffold — builds mode-specific prompts.
+
+#### Interactive Setup (`webtomd/ai/configure.py`)
+- Guided terminal wizard using `rich.prompt`:
+  - provider selection menu (1-5)
+  - key capture (or Ollama host)
+  - persists `ai_provider` to `~/.webtomdrc`
+  - sets env var for immediate session use
+  - security tip for non-Ollama providers
+
+#### CLI Integration (`webtomd/cli.py`)
+- Removed Phase 2/3 guardrails for `--ai`, `--configure`, `--batch`, `--metadata`.
+- `--configure` triggers wizard and exits.
+- `--ai <mode>` validates mode then applies AI post-processing after markdown conversion.
+- `--batch <file>` processes URL list sequentially with per-URL error isolation and summary.
+- `--metadata` passes through to `to_markdown()` frontmatter builder.
+- Refactored into `_convert_single()` for reuse by both single-URL and batch paths.
+- Added `_apply_ai()` helper with graceful fallback to raw markdown on any AI failure.
+
+#### Batch Mode
+- Reads URL file (one per line, `#` comments supported).
+- Per-URL failures are isolated and counted.
+- End summary: `N succeeded, M failed`.
+
+#### Metadata Frontmatter
+- Already wired from Phase 1 converter logic; Phase 3 just removed the guard.
+- End-to-end verified: YAML frontmatter with title, URL, date prepended to output.
+
+#### Easter Egg (`webtomd/easter_egg.py`)
+- Full space galaxy shooter game using `rich.Live` + `pynput`.
+- Arrow keys move, space shoots, q quits.
+- Wave-based enemy spawning with increasing difficulty.
+- Score tracking, lives system, game over screen.
+- Hidden trigger: `webtomd https://play.webtomd.dev`
+
+### Validation
+- **Test suite**: 28 passed, 0 failures.
+- **--metadata**: Verified end-to-end with `--stdout --silent` — YAML frontmatter correct.
+- **--ai (no key)**: Graceful fallback — warning printed, raw markdown output preserved.
+- **--ai (invalid mode)**: Clear error with valid mode list.
+- **--batch**: 2-URL test file processed successfully with per-URL status and summary.
+- **--configure**: Module imports verified; interactive flow tested at import level.
+- **Easter egg**: Module imports verified; game loop structure validated.
+- **Lints**: No linter errors in any changed files.
