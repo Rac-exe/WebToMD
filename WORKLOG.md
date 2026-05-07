@@ -565,3 +565,65 @@ Why:
 - **--configure**: Module imports verified; interactive flow tested at import level.
 - **Easter egg**: Module imports verified; game loop structure validated.
 - **Lints**: No linter errors in any changed files.
+
+---
+
+## Easter Egg Upgrade — Full Arcade Experience
+
+### Visual Enhancements
+- Rich color rendering: cyan player, red/magenta/yellow enemies, green power-ups.
+- Explosion effects with animated `*`/`+` particles and color cycling.
+- Styled HUD with box-drawing border (Unicode with ASCII fallback).
+- ASCII art title screen, controls display, and animated game-over screen.
+
+### Gameplay Mechanics
+- Fire rate limiter with normal and rapid-fire cooldowns.
+- Four enemy movement patterns: straight, zigzag, dive, fast.
+- Enemy HP system — tougher enemies in later waves.
+- Boss waves every 5 waves with custom AI: lateral movement + aimed shots.
+- Three power-up types: rapid fire, shield, triple shot (each with timers).
+- Player shield absorbs one hit; triple shot fires 3 bullets simultaneously.
+- High score persistence to `~/.webtomd-highscore`.
+- Sound feedback via terminal bell (`\a`) on game events.
+- Replay from game-over screen without restarting the CLI.
+
+### Balance Tuning (based on user feedback)
+- Reduced `FIRE_COOLDOWN_NORMAL` (4→2) and `FIRE_COOLDOWN_RAPID` (2→1).
+- Slowed enemy descent rate: `max(6 - wave//3, 2)` instead of `max(4 - wave//3, 1)`.
+- Slowed zigzag and dive enemy lateral/vertical speeds.
+- Increased `BOSS_SHOOT_INTERVAL` (8→12) for more forgiving boss fights.
+- Doubled player lateral movement speed (1→2 cells/tick).
+
+### Obfuscation
+- Renamed `webtomd/easter_egg.py` → `webtomd/_compat.py` with misleading docstring.
+- CLI import updated from `webtomd.easter_egg` → `webtomd._compat`.
+- Test file renamed `tests/test_easter_egg.py` → `tests/test_compat.py` with misleading docstring.
+
+### Test Coverage
+- 36 comprehensive tests covering all game mechanics: spawning, movement patterns, collisions, boss AI, power-ups, shield, triple shot, high score persistence, rendering, screen states, and trigger URL validation.
+- All 98 tests passing after full easter egg implementation.
+
+---
+
+## Ship-Readiness + Performance Pass
+
+### Ship-Readiness
+
+#### `__main__.py`
+- Created `webtomd/__main__.py` enabling `python -m webtomd` execution.
+- One-liner importing and calling `app()` from `cli.py`.
+
+#### README Overhaul
+- Complete rewrite with: project tagline, feature list, full install instructions (pip/uv, optional extras, playwright), usage examples for every flag, output defaults table, AI setup section, configuration reference, contributing guide, and license.
+
+#### `--help` Text Polish
+- All `typer.Option` help strings reviewed and updated for consistency.
+- Capitalization standardized, wording made concise and descriptive.
+- Examples: "Save to file" → "Save to a specific file path", "No animations (pipe-safe)" → "Suppress spinners and preview (pipe-safe)".
+
+#### Build Verification
+- `uv build` produces clean `webtomd-0.1.0-py3-none-any.whl` and `.tar.gz`.
+- All 17 modules included in wheel (core + AI + _compat).
+- Entry point `webtomd = webtomd.cli:app` verified via `entry_points.txt`.
+- `webtomd --help` and `python -m webtomd --help` both functional.
+- `pyproject.toml` metadata complete: classifiers, keywords, URLs, license.
