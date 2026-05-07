@@ -27,15 +27,15 @@ TICK_RATE = 0.08
 STAR_COUNT = 18
 HIGH_SCORE_PATH = Path.home() / ".webtomd-highscore"
 
-FIRE_COOLDOWN_NORMAL = 4
-FIRE_COOLDOWN_RAPID = 2
+FIRE_COOLDOWN_NORMAL = 2
+FIRE_COOLDOWN_RAPID = 1
 SHIELD_DURATION = 999
 RAPID_DURATION = 80
 TRIPLE_DURATION = 60
 POWERUP_DROP_CHANCE = 0.20
 BOSS_EVERY_N_WAVES = 5
 BOSS_HP = 12
-BOSS_SHOOT_INTERVAL = 8
+BOSS_SHOOT_INTERVAL = 12
 TOUGH_HP = 2
 EXPLOSION_FRAMES = 3
 
@@ -298,21 +298,21 @@ def _tick(state: GameState) -> None:
 
 
 def _move_enemies(state: GameState) -> None:
-    descent_rate = max(4 - state.wave // 3, 1)
+    descent_rate = max(6 - state.wave // 3, 2)
     for e in state.enemies:
         age = state.ticks - e.spawn_tick
         if e.pattern == "zigzag":
             if state.ticks % descent_rate == 0:
                 e.y += 1
-            if state.ticks % 3 == 0:
-                direction = 1 if (age // 8) % 2 == 0 else -1
+            if state.ticks % 4 == 0:
+                direction = 1 if (age // 10) % 2 == 0 else -1
                 e.x = max(1, min(e.x + direction, GAME_WIDTH - 2))
         elif e.pattern == "dive":
             if e.y < GAME_HEIGHT // 2:
                 if state.ticks % descent_rate == 0:
                     e.y += 1
             else:
-                if state.ticks % 2 == 0:
+                if state.ticks % 3 == 0:
                     e.y += 1
                     if e.x < state.player.x:
                         e.x += 1
