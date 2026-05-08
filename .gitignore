@@ -41,11 +41,17 @@ coverage.xml
 Thumbs.db
 desktop.ini
 
-# ── Editors ──
+# ── Editors / IDE ──
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
+
+# ── Local-only ──
+WORKLOG.md
+tests/
+eval-runs/
 
 # ── Docs / demo artifacts ──
 docs/demo.gif

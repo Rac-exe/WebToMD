@@ -1,6 +1,7 @@
 """Abstract base class for all AI providers."""
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 

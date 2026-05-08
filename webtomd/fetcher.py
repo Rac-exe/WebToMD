@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import httpx
 import re
-import trafilatura
-import typer
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 
-from webtomd.utils import is_sparse
+import httpx
+import trafilatura
+import typer
 
+from webtomd.utils import is_sparse
 
 DEFAULT_DOWNLOAD_TIMEOUT_S = 20.0
 FETCH_STAGE_TIMEOUT_S = 25.0
@@ -272,7 +273,8 @@ def _download_html(url: str, timeout_s: float = DEFAULT_DOWNLOAD_TIMEOUT_S) -> s
         fut_traf = pool.submit(_run_with_timeout, _traf, timeout_s=traf_timeout)
         fut_httpx = pool.submit(_run_with_timeout, _httpx, timeout_s=httpx_timeout)
 
-        for future in as_completed([fut_traf, fut_httpx], timeout=max(traf_timeout, httpx_timeout) + 3):
+        deadline = max(traf_timeout, httpx_timeout) + 3
+        for future in as_completed([fut_traf, fut_httpx], timeout=deadline):
             try:
                 result = future.result(timeout=1)
                 if result:
@@ -445,7 +447,8 @@ def _append_candidate(
         return
     if strategy.endswith("readability") and not _is_good_fallback(content, source_html):
         return
-    if strategy not in {"trafilatura", "readability", "playwright+trafilatura", "playwright+readability"}:
+    valid = {"trafilatura", "readability", "playwright+trafilatura", "playwright+readability"}
+    if strategy not in valid:
         return
 
     score = _quality_score(content=content, source_html=source_html)

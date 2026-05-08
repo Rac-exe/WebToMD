@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import typer
 
-from webtomd.ai.naming import suggest_filename_ai
 from webtomd import config as app_config
+from webtomd.ai.naming import suggest_filename_ai
 from webtomd.converter import SelectorNotFoundError, extract_title_hint, to_markdown
 from webtomd.fetcher import fetch, get_last_fetch_trace
 from webtomd.output import open_in_editor, to_clipboard, to_file, to_stdout
@@ -249,7 +249,8 @@ def _run_batch(
         print_error("Batch file is empty or contains only comments.")
         raise typer.Exit(1)
 
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
+
     from webtomd.renderer import console
 
     console.print(f"\n[bold cyan]Batch mode:[/bold cyan] {len(urls)} URLs\n")
@@ -287,7 +288,8 @@ def _run_batch(
                 results["failed"] += 1
             progress.update(task, advance=1, ok=results["success"], fail=results["failed"])
 
-    console.print(f"\n[bold]Batch complete:[/bold] {results['success']} succeeded, {results['failed']} failed\n")
+    ok, fail = results["success"], results["failed"]
+    console.print(f"\n[bold]Batch complete:[/bold] {ok} succeeded, {fail} failed\n")
 
 
 @app.command()
@@ -300,15 +302,33 @@ def snap(
         "--name-strategy",
         help="Filename strategy: 'deterministic' or 'ai'",
     ),
-    copy: bool | None = typer.Option(None, "--copy/--no-copy", help="Copy Markdown to clipboard"),
-    silent: bool | None = typer.Option(None, "--silent/--no-silent", help="Suppress spinners and preview (pipe-safe)"),
-    configure: bool = typer.Option(False, "--configure", help="Launch interactive AI provider setup wizard"),
-    ai: str = typer.Option(None, "--ai", help="AI post-processing mode: summarize, tl;dr, translate, extract, qa"),
-    batch: str = typer.Option(None, "--batch", help="Path to a file containing URLs (one per line)"),
-    selector: str = typer.Option(None, "--selector", help="CSS selector to extract specific page content"),
-    metadata: bool | None = typer.Option(None, "--metadata/--no-metadata", help="Prepend YAML frontmatter with title, URL, and date"),
-    open_after: bool = typer.Option(False, "--open", help="Open the saved file in your default editor"),
-    depth: int = typer.Option(0, "--depth", help="Crawl same-domain links N levels deep (0 = single page)"),
+    copy: bool | None = typer.Option(
+        None, "--copy/--no-copy", help="Copy Markdown to clipboard",
+    ),
+    silent: bool | None = typer.Option(
+        None, "--silent/--no-silent", help="Suppress spinners and preview",
+    ),
+    configure: bool = typer.Option(
+        False, "--configure", help="Launch AI provider setup wizard",
+    ),
+    ai: str = typer.Option(
+        None, "--ai", help="AI mode: summarize, tl;dr, translate, extract, qa",
+    ),
+    batch: str = typer.Option(
+        None, "--batch", help="File containing URLs (one per line)",
+    ),
+    selector: str = typer.Option(
+        None, "--selector", help="CSS selector to extract specific content",
+    ),
+    metadata: bool | None = typer.Option(
+        None, "--metadata/--no-metadata", help="Prepend YAML frontmatter",
+    ),
+    open_after: bool = typer.Option(
+        False, "--open", help="Open saved file in default editor",
+    ),
+    depth: int = typer.Option(
+        0, "--depth", help="Crawl same-domain links N levels deep",
+    ),
 ) -> None:
     """Convert any URL to clean Markdown."""
 

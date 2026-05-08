@@ -514,7 +514,8 @@ def _render(state: GameState) -> Text:
     powerup_display = ""
     if state.active_powerup:
         labels = {"R": "RAPID", "S": "SHIELD", "T": "TRIPLE"}
-        powerup_display = f"  PWR: {labels.get(state.active_powerup, '?')}({state.powerup_remaining})"
+        lbl = labels.get(state.active_powerup, '?')
+        powerup_display = f"  PWR: {lbl}({state.powerup_remaining})"
     boss_display = ""
     if boss and boss.alive:
         boss_display = f"  BOSS HP: {boss.hp}"
@@ -605,7 +606,8 @@ def launch() -> None:
     try:
         from pynput import keyboard
     except ImportError:
-        Console().print("[red]pynput is required for the easter egg. Install with: pip install pynput[/red]")
+        msg = "[red]pynput is required. Install with: pip install pynput[/red]"
+        Console().print(msg)
         return
 
     console = Console()
@@ -684,4 +686,7 @@ def launch() -> None:
             break
 
     console.clear()
-    console.print(f"\n[bold cyan]Thanks for playing![/bold cyan] Final score: [green]{state.score}[/green]\n")
+    console.print(
+        f"\n[bold cyan]Thanks for playing![/bold cyan]"
+        f" Final score: [green]{state.score}[/green]\n"
+    )

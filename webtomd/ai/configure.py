@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
 from rich.console import Console
 from rich.prompt import Prompt
-
-from webtomd.ai.detector import PROVIDER_ENV_MAP
 
 console = Console()
 
@@ -68,7 +65,6 @@ def _write_config(slug: str, env_key: str, value: str) -> None:
         existing_lines = CONFIG_PATH.read_text(encoding="utf-8").splitlines()
 
     new_lines: list[str] = []
-    keys_written = set()
     for line in existing_lines:
         stripped = line.strip()
         if stripped.startswith("ai_provider") or stripped.startswith(env_key.lower()):

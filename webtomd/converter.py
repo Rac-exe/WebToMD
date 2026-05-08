@@ -263,7 +263,9 @@ def _prune_structural_noise(soup: BeautifulSoup) -> None:
 
     for selector in selector_groups:
         for node in soup.select(selector):
-            if _should_prune_node(node, has_primary_content=has_primary_content, doc_text_len=doc_text_len):
+            if _should_prune_node(
+                node, has_primary_content=has_primary_content, doc_text_len=doc_text_len,
+            ):
                 node.decompose()
 
     for tag in soup.find_all(["a", "button", "span", "div", "p"]):

@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    raise RuntimeError("webtomd requires Python 3.11+")
 
 CONFIG_PATH = Path.home() / ".webtomdrc"
 
