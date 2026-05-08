@@ -1,6 +1,6 @@
 [project]
 name = "webtomd"
-version = "0.1.0"
+version = "0.1.2"
 description = "Web to Markdown. No garbage."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
@@ -54,9 +54,9 @@ dev = [
 webtomd = "webtomd.cli:app"
 
 [project.urls]
-Homepage   = "https://github.com/prabhat/webtomd"
-Repository = "https://github.com/prabhat/webtomd"
-Issues     = "https://github.com/prabhat/webtomd/issues"
+Homepage   = "https://github.com/MrRaccooon/WebToMD"
+Repository = "https://github.com/MrRaccooon/WebToMD"
+Issues     = "https://github.com/MrRaccooon/WebToMD/issues"
 
 [build-system]
 requires      = ["hatchling"]
