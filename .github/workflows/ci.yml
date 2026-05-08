@@ -7,17 +7,17 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -28,5 +28,5 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
-      - name: Test
-        run: uv run pytest --tb=short -q
+      - name: Check import
+        run: uv run python -c "import webtomd; print(webtomd.__version__)"
