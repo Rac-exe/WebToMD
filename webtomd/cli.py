@@ -28,7 +28,7 @@ app = typer.Typer(
     add_completion=False,
 )
 
-VALID_AI_MODES = {"summarize", "tl;dr", "translate", "extract", "qa"}
+VALID_AI_MODES = {"summarize", "tl;dr", "translate", "extract", "qa", "ui-rationale"}
 
 
 def _is_interactive_terminal() -> bool:
@@ -207,6 +207,59 @@ def _emit_result(
     return True
 
 
+def _convert_ui(
+    url: str,
+    cfg: app_config.Config,
+    *,
+    output: str | None,
+    stdout_flag: bool,
+    selector: str | None,
+    ai_mode: str | None,
+    open_after: bool,
+    include_images: bool,
+    output_format: str = "markdown",
+) -> bool:
+    """Extract UI design style guide from a URL. Returns True on success."""
+    from webtomd.ui_extractor import extract_ui
+    from webtomd.ui_style_guide import build_style_guide
+
+    fmt = output_format.lower().strip()
+    if fmt not in ("markdown", "tokens", "html"):
+        print_error(f"Unknown UI format: {fmt!r}. Choose from: markdown, tokens, html", silent=bool(cfg.silent))
+        return False
+
+    try:
+        with start_spinner("Scanning design system...", silent=bool(cfg.silent)):
+            data = extract_ui(url, include_images=include_images, selector=selector)
+            result = build_style_guide(data, output_format=fmt)
+    except RuntimeError as exc:
+        print_error(str(exc), silent=bool(cfg.silent))
+        return False
+    except Exception as exc:
+        print_error(f"UI extraction failed: {exc}", silent=bool(cfg.silent))
+        return False
+
+    ext = {"markdown": "", "tokens": "-tokens", "html": "-report"}[fmt]
+    hint = f"ui-guide{ext}-{data.page_title or 'site'}"
+
+    effective_ai = None
+    if ai_mode and fmt == "markdown":
+        effective_ai = "ui-rationale"
+
+    return _emit_result(
+        markdown=result,
+        url=url,
+        title_hint=hint,
+        cfg=cfg,
+        output=output,
+        stdout_flag=stdout_flag,
+        ai_mode=effective_ai,
+        open_after=open_after,
+        trace_strategy="ui",
+        trace_note=f"design style guide ({fmt}) via Playwright",
+    )
+
+
 def _apply_ai(markdown: str, mode: str, cfg: app_config.Config) -> str:
     """Run AI post-processing on markdown. Falls back gracefully."""
     from webtomd.ai import AIUnavailableError, process_ai
@@ -329,6 +382,15 @@ def snap(
     depth: int = typer.Option(
         0, "--depth", help="Crawl same-domain links N levels deep",
     ),
+    ui: bool = typer.Option(
+        False, "--ui", help="Extract design style guide (colors, fonts, spacing, components)",
+    ),
+    ui_format: str = typer.Option(
+        "markdown", "--format", help="With --ui: output format — markdown (default), tokens (JSON), html (visual report)",
+    ),
+    images: bool = typer.Option(
+        False, "--images", help="With --ui: download images/icons to a side folder",
+    ),
 ) -> None:
     """Convert any URL to clean Markdown."""
 
@@ -388,6 +450,20 @@ def snap(
     if not is_valid_url(url):
         print_error(f"Invalid URL: {url}", silent=bool(cfg.silent))
         raise typer.Exit(1)
+
+    if ui:
+        ok = _convert_ui(
+            url,
+            cfg,
+            output=output,
+            stdout_flag=stdout,
+            selector=selector,
+            ai_mode=ai,
+            open_after=open_after,
+            include_images=images,
+            output_format=ui_format,
+        )
+        raise typer.Exit(0 if ok else 1)
 
     if depth > 0:
         from webtomd.crawler import crawl

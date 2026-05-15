@@ -1,0 +1,444 @@
+﻿
+
+OK Converted to Markdown (865 tokens) via ui (design style guide (tokens) via 
+Playwright)
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "source": "https://linear.app",
+  "color": {
+    "background": {
+      "background-1": {
+        "$value": "rgba(255, 255, 255, 0.05)",
+        "$type": "color"
+      },
+      "background-2": {
+        "$value": "rgba(255, 255, 255, 0.02)",
+        "$type": "color"
+      },
+      "background-3": {
+        "$value": "rgba(255, 255, 255, 0.03)",
+        "$type": "color"
+      },
+      "background-4": {
+        "$value": "#0f1011",
+        "$type": "color"
+      },
+      "background-5": {
+        "$value": "#6366f1",
+        "$type": "color"
+      },
+      "background-6": {
+        "$value": "#000000",
+        "$type": "color"
+      },
+      "background-7": {
+        "$value": "rgba(255, 255, 255, 0.08)",
+        "$type": "color"
+      },
+      "background-8": {
+        "$value": "#23252a",
+        "$type": "color"
+      },
+      "background-9": {
+        "$value": "#eb5757",
+        "$type": "color"
+      },
+      "background-10": {
+        "$value": "#8b5cf6",
+        "$type": "color"
+      }
+    },
+    "text": {
+      "text-1": {
+        "$value": "#f7f8f8",
+        "$type": "color"
+      },
+      "text-2": {
+        "$value": "#62666d",
+        "$type": "color"
+      },
+      "text-3": {
+        "$value": "#d0d6e0",
+        "$type": "color"
+      },
+      "text-4": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "text-5": {
+        "$value": "#8a8f98",
+        "$type": "color"
+      },
+      "text-6": {
+        "$value": "#e2e4e7",
+        "$type": "color"
+      },
+      "text-7": {
+        "$value": "#e2e4e6",
+        "$type": "color"
+      },
+      "text-8": {
+        "$value": "#08090a",
+        "$type": "color"
+      },
+      "text-9": {
+        "$value": "#6d78d5",
+        "$type": "color"
+      }
+    },
+    "border": {
+      "border-1": {
+        "$value": "rgba(255, 255, 255, 0.05)",
+        "$type": "color"
+      },
+      "border-2": {
+        "$value": "rgba(255, 255, 255, 0.08)",
+        "$type": "color"
+      },
+      "border-3": {
+        "$value": "#f7f8f8",
+        "$type": "color"
+      },
+      "border-4": {
+        "$value": "#383b3f",
+        "$type": "color"
+      },
+      "border-5": {
+        "$value": "rgba(255, 255, 255, 0.1)",
+        "$type": "color"
+      },
+      "border-6": {
+        "$value": "#23252a",
+        "$type": "color"
+      },
+      "border-7": {
+        "$value": "#e5e5e6",
+        "$type": "color"
+      },
+      "border-8": {
+        "$value": "#24282c",
+        "$type": "color"
+      },
+      "border-9": {
+        "$value": "#323334",
+        "$type": "color"
+      },
+      "border-10": {
+        "$value": "rgba(255, 255, 255, 0.12)",
+        "$type": "color"
+      }
+    },
+    "accent": {
+      "$value": "#eb5757",
+      "$type": "color"
+    }
+  },
+  "typography": {
+    "family-1": {
+      "$value": "Inter Variable",
+      "$type": "fontFamily"
+    },
+    "family-2": {
+      "$value": "Berkeley Mono",
+      "$type": "fontFamily"
+    },
+    "size-display---h1": {
+      "$value": "40px",
+      "$type": "dimension"
+    },
+    "size-h3": {
+      "$value": "20px",
+      "$type": "dimension"
+    },
+    "size-body": {
+      "$value": "15px",
+      "$type": "dimension"
+    },
+    "size-body-small": {
+      "$value": "13px",
+      "$type": "dimension"
+    },
+    "size-code": {
+      "$value": "12.25px",
+      "$type": "dimension"
+    },
+    "size-caption": {
+      "$value": "10px",
+      "$type": "dimension"
+    }
+  },
+  "spacing": {
+    "space-1": {
+      "$value": "1px",
+      "$type": "dimension"
+    },
+    "space-2": {
+      "$value": "2px",
+      "$type": "dimension"
+    },
+    "space-3": {
+      "$value": "3px",
+      "$type": "dimension"
+    },
+    "space-4": {
+      "$value": "4px",
+      "$type": "dimension"
+    },
+    "space-5": {
+      "$value": "5px",
+      "$type": "dimension"
+    },
+    "space-6": {
+      "$value": "6px",
+      "$type": "dimension"
+    },
+    "space-7": {
+      "$value": "7px",
+      "$type": "dimension"
+    },
+    "space-8": {
+      "$value": "8px",
+      "$type": "dimension"
+    },
+    "space-9": {
+      "$value": "9px",
+      "$type": "dimension"
+    },
+    "space-10": {
+      "$value": "10px",
+      "$type": "dimension"
+    },
+    "space-11": {
+      "$value": "11px",
+      "$type": "dimension"
+    },
+    "space-12": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "space-14": {
+      "$value": "14px",
+      "$type": "dimension"
+    },
+    "space-15": {
+      "$value": "15px",
+      "$type": "dimension"
+    },
+    "space-16": {
+      "$value": "16px",
+      "$type": "dimension"
+    },
+    "space-17": {
+      "$value": "17px",
+      "$type": "dimension"
+    },
+    "space-19": {
+      "$value": "19px",
+      "$type": "dimension"
+    },
+    "space-20": {
+      "$value": "20px",
+      "$type": "dimension"
+    },
+    "space-21": {
+      "$value": "21px",
+      "$type": "dimension"
+    },
+    "space-22": {
+      "$value": "22px",
+      "$type": "dimension"
+    },
+    "space-23": {
+      "$value": "23px",
+      "$type": "dimension"
+    },
+    "space-24": {
+      "$value": "24px",
+      "$type": "dimension"
+    },
+    "space-26": {
+      "$value": "26px",
+      "$type": "dimension"
+    },
+    "space-27": {
+      "$value": "27px",
+      "$type": "dimension"
+    },
+    "space-28": {
+      "$value": "28px",
+      "$type": "dimension"
+    },
+    "space-30": {
+      "$value": "30px",
+      "$type": "dimension"
+    },
+    "space-31": {
+      "$value": "31px",
+      "$type": "dimension"
+    },
+    "space-32": {
+      "$value": "32px",
+      "$type": "dimension"
+    },
+    "space-35": {
+      "$value": "35px",
+      "$type": "dimension"
+    },
+    "space-36": {
+      "$value": "36px",
+      "$type": "dimension"
+    },
+    "space-39": {
+      "$value": "39px",
+      "$type": "dimension"
+    },
+    "space-41": {
+      "$value": "41px",
+      "$type": "dimension"
+    },
+    "space-43": {
+      "$value": "43px",
+      "$type": "dimension"
+    },
+    "space-48": {
+      "$value": "48px",
+      "$type": "dimension"
+    },
+    "space-51": {
+      "$value": "51px",
+      "$type": "dimension"
+    },
+    "space-56": {
+      "$value": "56px",
+      "$type": "dimension"
+    },
+    "space-58": {
+      "$value": "58px",
+      "$type": "dimension"
+    },
+    "space-64": {
+      "$value": "64px",
+      "$type": "dimension"
+    },
+    "space-69": {
+      "$value": "69px",
+      "$type": "dimension"
+    },
+    "space-72": {
+      "$value": "72px",
+      "$type": "dimension"
+    },
+    "space-73": {
+      "$value": "73px",
+      "$type": "dimension"
+    },
+    "space-96": {
+      "$value": "96px",
+      "$type": "dimension"
+    },
+    "space-99": {
+      "$value": "99px",
+      "$type": "dimension"
+    },
+    "space-127": {
+      "$value": "127px",
+      "$type": "dimension"
+    },
+    "space-128": {
+      "$value": "128px",
+      "$type": "dimension"
+    },
+    "space-132": {
+      "$value": "132px",
+      "$type": "dimension"
+    },
+    "space-152": {
+      "$value": "152px",
+      "$type": "dimension"
+    },
+    "space-155": {
+      "$value": "155px",
+      "$type": "dimension"
+    },
+    "space-156": {
+      "$value": "156px",
+      "$type": "dimension"
+    },
+    "space-161": {
+      "$value": "161px",
+      "$type": "dimension"
+    },
+    "space-166": {
+      "$value": "166px",
+      "$type": "dimension"
+    },
+    "space-199": {
+      "$value": "199px",
+      "$type": "dimension"
+    },
+    "space-200": {
+      "$value": "200px",
+      "$type": "dimension"
+    }
+  },
+  "borderRadius": {
+    "radius-1": {
+      "$value": "6px",
+      "$type": "dimension"
+    },
+    "radius-2": {
+      "$value": "9999px",
+      "$type": "dimension"
+    },
+    "radius-3": {
+      "$value": "50%",
+      "$type": "dimension"
+    },
+    "radius-4": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "radius-5": {
+      "$value": "4px",
+      "$type": "dimension"
+    },
+    "radius-6": {
+      "$value": "2px",
+      "$type": "dimension"
+    },
+    "radius-7": {
+      "$value": "7px",
+      "$type": "dimension"
+    },
+    "radius-8": {
+      "$value": "400px",
+      "$type": "dimension"
+    }
+  },
+  "shadow": {
+    "shadow-1": {
+      "$value": "rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px",
+      "$type": "shadow"
+    },
+    "shadow-2": {
+      "$value": "rgba(94, 106, 210, 0.1) 0px 0px 0px 0.0382249px",
+      "$type": "shadow"
+    },
+    "shadow-3": {
+      "$value": "rgba(0, 0, 0, 0.1) 0px 0px 0px 2px",
+      "$type": "shadow"
+    },
+    "shadow-4": {
+      "$value": "rgba(0, 0, 0, 0.2) 0px 0px 0px 1px",
+      "$type": "shadow"
+    },
+    "shadow-5": {
+      "$value": "rgb(35, 37, 42) 0px 0px 0px 1px inset",
+      "$type": "shadow"
+    },
+    "shadow-6": {
+      "$value": "rgba(0, 0, 0, 0.4) 0px 2px 4px 0px",
+      "$type": "shadow"
+    }
+  }
+}
