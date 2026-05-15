@@ -74,9 +74,18 @@ def fetch(url: str, selector: str | None = None) -> str:
     """
     raw_html = _download_html(url)
     if is_sparse(raw_html) or raw_html is None:
-        raise typer.BadParameter(
-            "Could not fetch meaningful content from this page."
+        rendered = _invoke_timeout_kw(
+            fetch_playwright,
+            url,
+            timeout_s=PLAYWRIGHT_STAGE_TIMEOUT_S,
         )
+        if rendered and not is_sparse(rendered):
+            raw_html = rendered
+            _set_trace("playwright_rescue", "static download too sparse; used Playwright")
+        else:
+            raise typer.BadParameter(
+                "Could not fetch meaningful content from this page."
+            )
 
     if selector:
         _set_trace("selector_raw_html", "selector mode uses downloaded html")
@@ -154,57 +163,59 @@ def fetch(url: str, selector: str | None = None) -> str:
         _set_trace(winner.strategy, f"{winner.note}; score={winner.score:.3f}")
         return winner.content
 
-    if _looks_js_rendered(raw_html):
-        rendered = _invoke_timeout_kw(
-            fetch_playwright,
-            url,
-            timeout_s=stage["playwright_timeout_s"],
+    # All static extractors failed — always try Playwright as last resort.
+    # Previously gated behind _looks_js_rendered(), but a total extraction
+    # failure is reason enough to try a headless browser.
+    rendered = _invoke_timeout_kw(
+        fetch_playwright,
+        url,
+        timeout_s=stage["playwright_timeout_s"],
+    )
+    if rendered and not is_sparse(rendered):
+        rendered_candidates: list[ExtractCandidate] = []
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            rt_future = pool.submit(
+                _invoke_timeout_kw,
+                fetch_trafilatura,
+                url,
+                downloaded_html=rendered,
+                timeout_s=stage["extract_timeout_s"],
+            )
+            rr_future = pool.submit(
+                _invoke_timeout_kw,
+                fetch_readability,
+                url,
+                downloaded_html=rendered,
+                timeout_s=stage["readability_timeout_s"],
+            )
+            rt_result = _safe_future_result(rt_future, stage["extract_timeout_s"] + 2)
+            rr_result = _safe_future_result(rr_future, stage["readability_timeout_s"] + 2)
+
+        _append_candidate(
+            rendered_candidates,
+            strategy="playwright+trafilatura",
+            content=rt_result,
+            source_html=rendered,
+            note="rendered parallel extraction",
         )
-        if rendered and not is_sparse(rendered):
-            rendered_candidates: list[ExtractCandidate] = []
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                rt_future = pool.submit(
-                    _invoke_timeout_kw,
-                    fetch_trafilatura,
-                    url,
-                    downloaded_html=rendered,
-                    timeout_s=stage["extract_timeout_s"],
-                )
-                rr_future = pool.submit(
-                    _invoke_timeout_kw,
-                    fetch_readability,
-                    url,
-                    downloaded_html=rendered,
-                    timeout_s=stage["readability_timeout_s"],
-                )
-                rt_result = _safe_future_result(rt_future, stage["extract_timeout_s"] + 2)
-                rr_result = _safe_future_result(rr_future, stage["readability_timeout_s"] + 2)
+        _append_candidate(
+            rendered_candidates,
+            strategy="playwright+readability",
+            content=rr_result,
+            source_html=rendered,
+            note="rendered parallel extraction",
+        )
 
-            _append_candidate(
-                rendered_candidates,
-                strategy="playwright+trafilatura",
-                content=rt_result,
-                source_html=rendered,
-                note="rendered parallel extraction",
+        rendered_winner = _pick_best_candidate(rendered_candidates)
+        if rendered_winner is not None:
+            _set_trace(
+                rendered_winner.strategy,
+                f"{rendered_winner.note}; score={rendered_winner.score:.3f}",
             )
-            _append_candidate(
-                rendered_candidates,
-                strategy="playwright+readability",
-                content=rr_result,
-                source_html=rendered,
-                note="rendered parallel extraction",
-            )
+            return rendered_winner.content
 
-            rendered_winner = _pick_best_candidate(rendered_candidates)
-            if rendered_winner is not None:
-                _set_trace(
-                    rendered_winner.strategy,
-                    f"{rendered_winner.note}; score={rendered_winner.score:.3f}",
-                )
-                return rendered_winner.content
-
-            _set_trace("playwright_raw", "rendered candidates too weak; using rendered html")
-            return rendered
+        _set_trace("playwright_raw", "rendered candidates too weak; using rendered html")
+        return rendered
 
     _set_trace("raw_html", "all extractor candidates below quality threshold")
     return raw_html
@@ -350,13 +361,39 @@ def fetch_playwright(url: str, timeout_s: float = PLAYWRIGHT_STAGE_TIMEOUT_S) ->
             browser = p.chromium.launch(headless=True)
             try:
                 page = browser.new_page()
-                page.goto(url, wait_until="domcontentloaded", timeout=15_000)
-                page.wait_for_timeout(1_500)
+                page.goto(url, wait_until="networkidle", timeout=20_000)
+                page.wait_for_timeout(2_500)
+                _dismiss_overlays(page)
                 return page.content()
             finally:
                 browser.close()
 
     return _run_with_timeout(_render, timeout_s=timeout_s)
+
+
+def _dismiss_overlays(page) -> None:
+    """Best-effort removal of cookie banners and modals before capturing content."""
+    try:
+        page.evaluate("""() => {
+            const selectors = [
+                '[class*="cookie" i]', '[id*="cookie" i]',
+                '[class*="consent" i]', '[id*="consent" i]',
+                '[class*="popup" i]', '[class*="modal" i]',
+                '[class*="overlay" i]', '[class*="banner" i]',
+                '[aria-label*="cookie" i]', '[role="dialog"]',
+            ];
+            for (const sel of selectors) {
+                for (const el of document.querySelectorAll(sel)) {
+                    const rect = el.getBoundingClientRect();
+                    const isFixed = getComputedStyle(el).position === 'fixed';
+                    const coversViewport = rect.width > window.innerWidth * 0.5
+                                        && rect.height > 60;
+                    if (isFixed && coversViewport) el.remove();
+                }
+            }
+        }""")
+    except Exception:
+        pass
 
 
 def _run_with_timeout(func, timeout_s: float):
@@ -389,11 +426,16 @@ def _is_good_fallback(content: str | None, source_html: str | None = None) -> bo
 
 def _looks_js_rendered(html: str) -> bool:
     snippet = html.lower()
-    if "id=\"__next\"" in snippet or "id=\"root\"" in snippet:
+    spa_markers = (
+        'id="__next"', 'id="root"', 'id="app"', 'id="__nuxt"',
+        'id="__gatsby"', 'id="svelte"', 'id="ember-application"',
+        'ng-app=', 'data-reactroot', 'data-server-rendered',
+    )
+    if any(marker in snippet for marker in spa_markers):
         return True
     script_count = snippet.count("<script")
     body_text = len(" ".join(re.sub(r"<[^>]+>", " ", html).split()))
-    return script_count > 25 and body_text < 150
+    return script_count > 15 and body_text < 300
 
 
 def _should_try_readability(html: str) -> bool:

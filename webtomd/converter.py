@@ -61,17 +61,20 @@ def to_markdown(
             raise SelectorNotFoundError(f"No element matched selector: {selector}")
         source_html = str(selected)
 
+    source_html = _fix_code_blocks(source_html)
     source_html = _fix_tables(source_html)
 
     markdown = md(
         source_html,
         heading_style="ATX",
         bullets="-",
-        strip=["script", "style", "nav", "footer"],
+        strip=["script", "style"],
+        code_language_callback=_detect_code_lang,
     )
     markdown = _normalize_numbering(markdown)
     markdown = _drop_css_noise(markdown)
     markdown = _drop_markdown_chrome(markdown)
+    markdown = _clean_image_refs(markdown)
     markdown = re.sub(r"\n{3,}", "\n\n", markdown).strip()
 
     if metadata and url:
@@ -91,6 +94,47 @@ def _build_frontmatter(title: str, url: str) -> str:
         f'date: "{today}"\n'
         "---"
     )
+
+
+def _fix_code_blocks(html: str) -> str:
+    """Normalize <pre>/<code> blocks so markdownify emits fenced code blocks.
+
+    - Strips line-number <span>s that some syntax highlighters inject
+    - Ensures <pre> wraps a single <code> for reliable fencing
+    - Preserves language class on the <code> element
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    changed = False
+
+    for pre in soup.find_all("pre"):
+        code = pre.find("code")
+        if not code:
+            raw_text = pre.get_text("\n")
+            if len(raw_text.strip()) > 10:
+                new_code = soup.new_tag("code")
+                new_code.string = raw_text
+                pre.clear()
+                pre.append(new_code)
+                changed = True
+            continue
+
+        for line_num_el in code.find_all(
+            lambda tag: tag.get("class") and any(
+                "line-number" in c or "linenumber" in c or "hljs-ln-n" in c
+                for c in tag.get("class", [])
+            )
+        ):
+            line_num_el.decompose()
+            changed = True
+
+    return str(soup) if changed else html
+
+
+def _clean_image_refs(markdown: str) -> str:
+    """Clean up broken or data-uri image references."""
+    markdown = re.sub(r"!\[[^\]]*\]\(data:image/[^)]+\)", "", markdown)
+    markdown = re.sub(r"!\[\]\((?:about:blank|javascript:[^)]*)\)", "", markdown)
+    return markdown
 
 
 def _fix_tables(html: str) -> str:
@@ -212,11 +256,41 @@ def _sanitize_html(html: str) -> str:
     return str(soup)
 
 
+def _detect_code_lang(el) -> str | None:
+    """Try to detect programming language from a <pre>/<code> element's class."""
+    classes = el.get("class", []) if hasattr(el, "get") else []
+    for cls in classes:
+        if isinstance(cls, str):
+            m = re.match(r"(?:language|lang|highlight)-(\w+)", cls)
+            if m:
+                return m.group(1)
+    parent = el.parent if hasattr(el, "parent") else None
+    if parent:
+        parent_classes = parent.get("class", []) if hasattr(parent, "get") else []
+        for cls in parent_classes:
+            if isinstance(cls, str):
+                m = re.match(r"(?:language|lang|highlight)-(\w+)", cls)
+                if m:
+                    return m.group(1)
+    return None
+
+
 def _drop_css_noise(markdown: str) -> str:
     """Drop common CSS blobs that can leak through raw HTML conversion."""
     cleaned: list[str] = []
+    in_code_block = False
     for line in markdown.splitlines():
         stripped = line.strip()
+
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            cleaned.append(line)
+            continue
+
+        if in_code_block:
+            cleaned.append(line)
+            continue
+
         if not stripped:
             cleaned.append(line)
             continue
@@ -224,12 +298,15 @@ def _drop_css_noise(markdown: str) -> str:
         if stripped.startswith("@import url("):
             continue
 
-        # Heuristic CSS-like line filter.
+        if stripped.startswith("@keyframes "):
+            continue
+
         if (
-            ("{" in stripped and "}" in stripped)
-            or stripped.startswith("@keyframes ")
-            or stripped.startswith(".")
-        ) and ":" in stripped:
+            "{" in stripped and "}" in stripped
+            and ":" in stripped
+            and not any(c.isalpha() and c.isupper() for c in stripped[:20])
+            and stripped.count(";") >= 2
+        ):
             continue
 
         cleaned.append(line)
@@ -241,6 +318,14 @@ def _prune_structural_noise(soup: BeautifulSoup) -> None:
     """Drop obvious chrome/sidebar/cookie shells before conversion."""
     has_primary_content = bool(soup.find(["main", "article"]))
     doc_text_len = len(soup.get_text(" ", strip=True))
+
+    # When main/article exists, scope conversion to just that region
+    if has_primary_content:
+        primary = soup.find("main") or soup.find("article")
+        if primary and len(primary.get_text(" ", strip=True)) > max(doc_text_len * 0.25, 200):
+            _prune_within_primary(soup, primary, doc_text_len)
+            return
+
     structural_selectors = [
         "footer",
         "aside",
@@ -268,19 +353,68 @@ def _prune_structural_noise(soup: BeautifulSoup) -> None:
             ):
                 node.decompose()
 
+    _remove_boilerplate_text(soup)
+
+
+def _prune_within_primary(soup: BeautifulSoup, primary, doc_text_len: int) -> None:
+    """When a <main>/<article> exists, remove everything outside it plus noise inside."""
+    body = soup.find("body")
+    if body:
+        for child in list(body.children):
+            if not hasattr(child, "name") or not child.name:
+                continue
+            if child is primary:
+                continue
+            try:
+                if primary in child.descendants:
+                    continue
+            except Exception:
+                continue
+            child.decompose()
+
+    noise_inside = [
+        "footer", "aside", "[role='navigation']",
+        "[class*='sidebar' i]", "[class*='breadcrumbs' i]",
+        "[id*='cookie' i]", "[class*='cookie' i]",
+        "[id*='consent' i]", "[class*='consent' i]",
+    ]
+    for sel in noise_inside:
+        for node in primary.select(sel):
+            text_len = len(node.get_text(" ", strip=True))
+            if text_len < 400:
+                node.decompose()
+
+    _remove_boilerplate_text(soup)
+
+
+def _remove_boilerplate_text(soup: BeautifulSoup) -> None:
+    """Remove small boilerplate text elements."""
+    exact_kill = {
+        "skip to content",
+        "skip to main content",
+        "cookie settings",
+        "accept all cookies",
+        "reject all cookies",
+        "loading...",
+        "copy page",
+        "sign up",
+        "open app",
+        "privacy policy",
+        "cookie policy",
+        "terms of service",
+        "terms of use",
+        "terms and conditions",
+        "do not share or sell my info",
+        "manage cookies",
+        "cookie preferences",
+        "accept cookies",
+        "reject cookies",
+        "accessibility help",
+        "accessibility statement",
+    }
     for tag in soup.find_all(["a", "button", "span", "div", "p"]):
         text = tag.get_text(" ", strip=True).lower()
-        if text in {
-            "skip to content",
-            "skip to main content",
-            "cookie settings",
-            "accept all cookies",
-            "reject all cookies",
-            "loading...",
-            "copy page",
-            "sign up",
-            "open app",
-        } and len(text) <= 20:
+        if text in exact_kill and len(text) <= 40:
             tag.decompose()
 
 
@@ -329,12 +463,33 @@ def _drop_markdown_chrome(markdown: str) -> str:
         "reject all cookies",
         "loading...",
         "copy page",
+        "privacy policy",
+        "cookie policy",
+        "terms of service",
+        "terms of use",
+        "manage cookies",
+        "cookie preferences",
+        "accessibility help",
+        "accessibility statement",
     )
     cleaned: list[str] = []
     link_wall_streak = 0
+    noise_link_re = re.compile(
+        r"^\s*-?\s*\[(" + "|".join(re.escape(t) for t in noise_tokens) + r")\]\([^)]*\)\s*$",
+        re.IGNORECASE,
+    )
+    footer_link_patterns = re.compile(
+        r"^\s*-?\s*\[(cookies?|do not share[^]]*|terms[^]]*|privacy[^]]*)\]\([^)]*\)\s*$",
+        re.IGNORECASE,
+    )
+
     for line in markdown.splitlines():
         stripped = line.strip().lower()
         if stripped in noise_tokens:
+            continue
+        if noise_link_re.match(line):
+            continue
+        if footer_link_patterns.match(line):
             continue
 
         link_count = line.count("](")
@@ -344,11 +499,9 @@ def _drop_markdown_chrome(markdown: str) -> str:
         else:
             link_wall_streak = 0
 
-        # Keep at most one line from long runs of link walls.
         if is_link_wall and link_wall_streak >= 2:
             continue
 
-        # Drop isolated huge navigation rows composed almost entirely of links.
         if link_count >= 10 and len(line) > 180:
             continue
 
