@@ -14,6 +14,7 @@ That's it. Clean `.md` file, saved to your current directory.
 ## Who is this for?
 
 - **Developers** building RAG pipelines, training datasets, or knowledge bases from web content
+- **Designers** extracting design systems, color palettes, and typography from live sites
 - **Technical writers** pulling reference material from docs, wikis, and blogs into Markdown
 - **Researchers** archiving web articles in a portable, version-controllable format
 - **AI engineers** feeding clean web content into LLM prompts without HTML noise
@@ -24,7 +25,8 @@ That's it. Clean `.md` file, saved to your current directory.
 Most web-to-markdown tools give you a wall of nav links, cookie banners, and broken formatting. webtomd doesn't.
 
 - **Actually clean output** ➜ not just converted HTML, but intelligently extracted content with navs, sidebars, and ads stripped out
-- **Works on real websites** ➜ handles JS-rendered SPAs, paywalled layouts, complex tables, and nested lists
+- **Works on real websites** ➜ handles JS-rendered SPAs (React, Next.js, Vue), complex tables, code blocks, and nested lists — Playwright kicks in automatically when static extraction fails
+- **Design system extraction** ➜ `--ui` pulls colors, typography, spacing, components from any site as markdown, JSON tokens, or HTML report
 - **One command, zero config** ➜ no browser extensions, no copy-paste, no manual cleanup
 - **Plugs into your workflow** ➜ pipes, batch files, stdin, clipboard, AI post-processing, all from the terminal
 - **Your AI provider, your choice** ➜ works with OpenAI, Anthropic, Gemini, Groq, or local Ollama
@@ -54,16 +56,16 @@ pipx install webtomd
 ### Optional extras
 
 ```bash
+# JS-rendered pages + UI extraction (recommended)
+pip install "webtomd[playwright]"
+playwright install chromium
+
 # AI provider support
 pip install "webtomd[openai]"
 pip install "webtomd[anthropic]"
 pip install "webtomd[gemini]"
 pip install "webtomd[groq]"
 pip install "webtomd[ai-all]"
-
-# JS-rendered page support (SPAs, React/Vue/Next.js sites)
-pip install "webtomd[playwright]"
-playwright install chromium
 ```
 
 ### Verify installation
@@ -80,18 +82,20 @@ python -m webtomd --help
 
 ## Features
 
-- **Smart extraction**: trafilatura + readability fallback chain with quality scoring
-- **JS-rendered pages**: optional Playwright fallback for SPAs
-- **AI modes**: summarize, translate, extract, Q&A via Anthropic / OpenAI / Gemini / Groq / Ollama
+- **Smart extraction**: trafilatura + readability + automatic Playwright fallback chain with quality scoring
+- **JS-rendered pages**: headless Chromium triggers automatically when static extraction fails — React, Next.js, Vue, Stripe, Notion all work
+- **UI design extraction**: `--ui` extracts colors, typography, spacing, components, CSS variables, and layout patterns from any site
+- **Multiple UI formats**: `--format markdown` (default), `--format tokens` (JSON design tokens), `--format html` (visual report)
+- **AI modes**: summarize, translate, extract, Q&A, design rationale via Anthropic / OpenAI / Gemini / Groq / Ollama
 - **Batch processing**: convert a file of URLs in one command with progress bar
+- **Recursive crawl**: `--depth N` discovers and converts same-domain linked pages
 - **CSS selectors**: target specific page sections
 - **YAML frontmatter**: title, URL, date metadata
 - **Auto-save**: interactive terminals save files; piped runs output to stdout
 - **Smart filenames**: deterministic or AI-assisted naming
 - **Clipboard**: copy output with `--copy`
 - **stdin support**: pipe HTML directly
-- **Recursive crawl**: `--depth N` discovers and converts same-domain linked pages
-- **Clean output**: strips nav, sidebars, cookie banners, CSS noise, duplicate content
+- **Clean output**: strips nav, sidebars, cookie banners, CSS noise, duplicate content — scopes to `<main>`/`<article>` when present
 - **Cross-platform**: Windows, macOS, Linux with encoding-safe output
 
 ## Usage
@@ -107,6 +111,22 @@ webtomd https://example.com/article -o article.md
 
 # Force output to terminal
 webtomd https://example.com/article --stdout
+```
+
+### UI design extraction
+
+```bash
+# Extract design system as markdown style guide
+webtomd https://stripe.com --ui
+
+# Output as JSON design tokens (DTCG format)
+webtomd https://linear.app --ui --format tokens
+
+# Output as self-contained visual HTML report
+webtomd https://vercel.com --ui --format html
+
+# AI-enhanced with design rationale + accessibility recommendations
+webtomd https://notion.so --ui --ai
 ```
 
 ### Selectors and metadata
@@ -171,6 +191,30 @@ webtomd https://example.com --silent -o out.md
 webtomd https://example.com --name-strategy deterministic
 webtomd https://example.com --name-strategy ai
 ```
+
+## UI Extraction
+
+The `--ui` flag uses Playwright to render a page and extract its complete design system:
+
+| What it extracts | Details |
+|---|---|
+| **Color palette** | Grouped by role (dark/light/accent/transparent) with usage counts |
+| **Typography** | Font stacks, sizes, weights, role labels (Display, H1-H6, Body, Caption) |
+| **Spacing scale** | Auto-detected grid base (4px, 8px) with all spacing values |
+| **CSS variables** | Categorized into color, spacing, typography, and other tokens |
+| **Components** | Buttons (with variants), inputs, navigation links |
+| **Layout patterns** | Flexbox/grid patterns, border radii, shadows |
+| **Design philosophy** | Auto-detected theme, accent color, typeface count |
+
+Three output formats:
+
+```bash
+webtomd https://stripe.com --ui                    # Markdown style guide (default)
+webtomd https://stripe.com --ui --format tokens    # JSON design tokens (DTCG)
+webtomd https://stripe.com --ui --format html      # Visual HTML report
+```
+
+Combine with `--ai` for design rationale, accessibility recommendations, and theme suggestions.
 
 ## AI Setup
 
@@ -272,6 +316,11 @@ Each URL is processed independently with a live progress bar. Failures don't abo
 **Playwright not installing:**
 - Run `playwright install chromium` after installing the playwright extra
 - On Linux, you may need system deps: `playwright install-deps chromium`
+
+**Empty output on JS-heavy sites:**
+- Install Playwright: `pip install "webtomd[playwright]"` then `playwright install chromium`
+- webtomd auto-detects when static extraction fails and falls back to headless Chromium
+- Sites like Stripe, Notion, React.dev, Shopify all work with Playwright installed
 
 **Clipboard not working:**
 - macOS: works out of the box (`pbcopy`)
