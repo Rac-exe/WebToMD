@@ -1,6 +1,6 @@
 [project]
 name = "webtomd"
-version = "0.1.2"
+version = "0.1.3"
 description = "Web to Markdown. No garbage."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
