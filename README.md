@@ -334,7 +334,7 @@ Each URL is processed independently with a live progress bar. Failures don't abo
 ## Contributing
 
 ```bash
-git clone https://github.com/MrRaccooon/WebToMD.git
+git clone https://github.com/Rac-exe/WebToMD.git
 cd WebToMD
 ```
 

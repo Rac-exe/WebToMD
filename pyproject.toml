@@ -54,9 +54,9 @@ dev = [
 webtomd = "webtomd.cli:app"
 
 [project.urls]
-Homepage   = "https://github.com/MrRaccooon/WebToMD"
-Repository = "https://github.com/MrRaccooon/WebToMD"
-Issues     = "https://github.com/MrRaccooon/WebToMD/issues"
+Homepage   = "https://github.com/Rac-exe/WebToMD"
+Repository = "https://github.com/Rac-exe/WebToMD"
+Issues     = "https://github.com/Rac-exe/WebToMD/issues"
 
 [build-system]
 requires      = ["hatchling"]
